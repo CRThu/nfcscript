@@ -8,8 +8,8 @@ def run_script(script_path):
     script_dir = os.path.dirname(os.path.abspath(script_path))
     sys.path.insert(0, script_dir)
     
-    # Run the script as a module
-    runpy.run_path(script_path)
+    # Run the script as __main__ so __name__ == "__main__" works inside the script
+    runpy.run_path(script_path, run_name="__main__")
 
 def main():
     print("Hello from nfcscript!")
