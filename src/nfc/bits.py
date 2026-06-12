@@ -1,4 +1,6 @@
-def bits_update(val: int, mask: int, data: int) -> int:
+from .hex_util import FORMAT_HEX
+
+def BITS_UPDATE(val: int, mask: int, data: int) -> int:
     """
     更新寄存器中的特定位域 (Read-Modify-Write)
     :param val:         当前寄存器的原始值
@@ -6,10 +8,10 @@ def bits_update(val: int, mask: int, data: int) -> int:
     :param data:        已移位对齐的新数值 (例如: 0x20, 即 1 << 5)
     :return:            更新后的寄存器值
     """
-    assert (data & ~mask) == 0, f"Data {hex(data)} contains bits outside mask {hex(mask)}"
+    assert (data & ~mask) == 0, f"Data {FORMAT_HEX(data)} contains bits outside mask {FORMAT_HEX(mask)}"
     return (val & ~mask) | (data & mask)
 
-def bits_set(val: int, mask: int) -> int:
+def BITS_SET(val: int, mask: int) -> int:
     """
     将寄存器中的指定位强制置 1 (OR 操作)
     
@@ -17,7 +19,7 @@ def bits_set(val: int, mask: int) -> int:
     """
     return val | mask
 
-def bits_reset(val: int, mask: int) -> int:
+def BITS_RESET(val: int, mask: int) -> int:
     """
     将寄存器中的指定位强制清 0 (AND-NOT 操作)
     
