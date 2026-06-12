@@ -1,6 +1,6 @@
 [project]
 name = "nfcscript"
-version = "0.0.3"
+version = "0.0.4"
 description = "A plugin-based core engine for DSL-style NFC testing automation."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -29,12 +29,14 @@ dev = [
 ]
 
 [tool.bumpversion]
-current_version = "0.0.3"
+current_version = "0.0.4"
+commit = true
+tag = true
 allow_dirty = true
+tag_name = "v{new_version}"
+message = "chore(release): bump version {current_version} → {new_version}"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
