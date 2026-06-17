@@ -1,27 +1,65 @@
-from nfctester.registry import CardReaderRegistry, CardRegistry
+from contextlib import contextmanager
+from nfctester.registry import CardReaderRegistry
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
 from .checksum import GET_BCC
 from .hex_util import FORMAT_HEX
 
-# Global state
-_reader = None
-_driver = None
-_is_connected = False
+
+class _NFCState:
+    """单例状态管理，封装读卡器生命周期"""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._reader = None
+            cls._instance._connected = False
+        return cls._instance
+
+    @property
+    def reader(self):
+        return self._reader
+
+    def connect(self, port: str = "COM20"):
+        self._reader = CardReaderRegistry.create("pn532", transport="serial", port=port)
+        self._reader.connect()
+        self._connected = True
+        print(f"Connected to PN532 on port {port}")
+
+    def disconnect(self):
+        if self._connected and self._reader:
+            self._reader.disconnect()
+            self._connected = False
+            self._reader = None
+            print("Disconnected")
+
+    def ensure_connected(self):
+        ASSERT_IS_NOT_NONE(self._reader, msg="NFC driver not connected. Call connect() first.")
 
 
-def connect(port="COM20"):
+_state = _NFCState()
+
+
+def connect(port: str = "COM20"):
     """
     连接并初始化 PN532 读卡器。
 
     Args:
         port: 串口号，默认为 "COM20"。
     """
-    global _reader, _driver, _is_connected
-    _reader = CardReaderRegistry.create("pn532", transport="serial", port=port)
-    _driver = _reader
-    _reader.connect()
-    _is_connected = True
-    print(f"Connected to PN532 on port {port}")
+    _state.connect(port)
+
+
+def get_reader():
+    """
+    获取当前连接的读卡器实例，供 Card 类使用。
+
+    Returns:
+        reader: 当前连接的读卡器实例。
+    """
+    _state.ensure_connected()
+    return _state.reader
 
 
 def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
@@ -41,65 +79,66 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
               - 'sak' (int):   卡片的 SAK (Select Acknowledge)。
               - 'raw' (bytes): PN532 返回的原始响应数据。
     """
-    ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected. Call connect() first.")
+    _state.ensure_connected()
+    reader = _state.reader
 
     if not ll:
-        return _driver.find()
-    else:
-        # 手动底层寻卡流程
-        # 1. REQA
-        res_reqa = reqa()
-        if not res_reqa:
+        return reader.find()
+
+    # 手动底层寻卡流程
+    # 1. REQA
+    res_reqa = reqa()
+    if not res_reqa:
+        return None
+    atq = bytes(res_reqa[0])
+
+    # 2. 抗冲突与选择
+    full_uid = []
+    sak = 0
+    for cl in [1, 2, 3]:
+        res = anticoll(cl_level=cl, nvb=0x20)
+        if not res or not res[0]:
             return None
-        atq = bytes(res_reqa[0])
 
-        # 2. 抗冲突与选择
-        full_uid = []
-        sak = 0
-        for cl in [1, 2, 3]:
-            res = anticoll(cl_level=cl, nvb=0x20)
-            if not res or not res[0]:
-                return None
+        data = res[0]
+        # 只有当有数据时才进行长度校验
+        if len(data) > 0:
+            ASSERT_LEN(data, 5, msg=f"CL{cl} 抗冲突返回数据长度不符: {FORMAT_HEX(data)}")
 
-            data = res[0]
-            # 只有当有数据时才进行长度校验
-            if len(data) > 0:
-                ASSERT_LEN(data, 5, msg=f"CL{cl} 抗冲突返回数据长度不符: {FORMAT_HEX(data)}")
+            # 计算期望的 BCC
+            expected_bcc = GET_BCC(data[0:4])
 
-                # 计算期望的 BCC
-                expected_bcc = GET_BCC(data[0:4])
+            if not ignore_error:
+                ASSERT_EQUAL(expected_bcc, data[4], msg=f"CL{cl} BCC 校验失败: data={FORMAT_HEX(data)}")
+            elif data[4] != expected_bcc:
+                print(f"Warning: CL{cl} BCC 校验失败")
 
-                if not ignore_error:
-                    ASSERT_EQUAL(expected_bcc, data[4], msg=f"CL{cl} BCC 校验失败: data={FORMAT_HEX(data)}")
-                elif data[4] != expected_bcc:
-                    print(f"Warning: CL{cl} BCC 校验失败")
+        has_next = (data[0] == 0x88)
+        uid_to_select = data[0:5]
+        sak_res = select(cl_level=cl, uid=uid_to_select)
 
-            has_next = (data[0] == 0x88)
-            uid_to_select = data[0:5]
-            sak_res = select(cl_level=cl, uid=uid_to_select)
-
-            # SAK 校验
-            if not sak_res:
-                if not ignore_error:
-                    ASSERT_IS_NOT_NONE(sak_res, msg=f"CL{cl} SAK 选择失败")
-                else:
-                    print(f"Warning: CL{cl} SAK 选择失败")
-
-            if has_next:
-                full_uid.extend(data[1:4])
+        # SAK 校验
+        if not sak_res:
+            if not ignore_error:
+                ASSERT_IS_NOT_NONE(sak_res, msg=f"CL{cl} SAK 选择失败")
             else:
-                full_uid.extend(data[0:4])
-                # 记录最后一次 SELECT 的 SAK
-                sak = sak_res[0] if sak_res else 0
-                break
+                print(f"Warning: CL{cl} SAK 选择失败")
 
-        # 返回兼容的字典格式
-        return {
-            'uid': bytes(full_uid),
-            'atq': atq,
-            'sak': sak,
-            'raw': bytes(full_uid)  # 兼容原有的 raw 字段
-        }
+        if has_next:
+            full_uid.extend(data[1:4])
+        else:
+            full_uid.extend(data[0:4])
+            # 记录最后一次 SELECT 的 SAK
+            sak = sak_res[0] if sak_res else 0
+            break
+
+    # 返回兼容的字典格式
+    return {
+        'uid': bytes(full_uid),
+        'atq': atq,
+        'sak': sak,
+        'raw': bytes(full_uid),  # 兼容原有的 raw 字段
+    }
 
 
 def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> list[int]:
@@ -114,10 +153,10 @@ def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> lis
     Returns:
         list[int]: 接收到的数据字节列表。
     """
-    ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected.")
-    _driver.set_crc(tx_crc, rx_crc)
-    res = _driver.transceive(bytes(data))
-    # print(f"transceive: {FORMAT_HEX(data)}")
+    _state.ensure_connected()
+    reader = _state.reader
+    reader.set_crc(tx_crc, rx_crc)
+    res = reader.transceive(bytes(data))
     return list(res) if res is not None else []
 
 
@@ -136,11 +175,11 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
         tuple[list[int], int]: (接收到的数据字节列表, 最后一个字节的有效位数)。
                                最后一个字节的有效位数 0 表示完整字节。
     """
-    ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected.")
-    _driver.set_crc(tx_crc, rx_crc)
-    res = _driver.transceive(bytes(data), last_tx_bits=last_tx_bits)
-    # print(f"transceive: {FORMAT_HEX(data, last_tx_bits)}")
-    return (list(res) if res is not None else []), _driver.last_rx_bits
+    _state.ensure_connected()
+    reader = _state.reader
+    reader.set_crc(tx_crc, rx_crc)
+    res = reader.transceive(bytes(data), last_tx_bits=last_tx_bits)
+    return (list(res) if res is not None else []), reader.last_rx_bits
 
 
 def reqa() -> tuple[list[int], int] | None:
@@ -187,22 +226,34 @@ def select(cl_level: int, uid: list[int]) -> list[int] | None:
 
 def field_on():
     """开启 PN532 的 RF 场。"""
-    ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected.")
-    _driver.set_rf_field(True)
+    _state.ensure_connected()
+    _state.reader.set_rf_field(True)
 
 
 def field_off():
     """关闭 PN532 的 RF 场。"""
-    ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected.")
-    _driver.set_rf_field(False)
+    _state.ensure_connected()
+    _state.reader.set_rf_field(False)
 
 
 def close():
     """
     断开与 PN532 读卡器的连接。
     """
-    global _is_connected
-    if _is_connected and _driver:
-        _driver.disconnect()
-        _is_connected = False
-        print("Disconnected")
+    _state.disconnect()
+
+
+@contextmanager
+def session(port: str = "COM20"):
+    """
+    上下文管理器，自动管理连接生命周期。
+
+    用法:
+        with session("COM20") as reader:
+            card_info = reader.find()
+    """
+    _state.connect(port)
+    try:
+        yield _state.reader
+    finally:
+        _state.disconnect()
