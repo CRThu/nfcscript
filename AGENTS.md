@@ -23,6 +23,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。
 *   `transceive_bits(data, last_tx_bits=0, ...)`: 支持位控制的帧交互。
 *   `reqa()` / `wupa()`: ISO14443-A 短帧命令。
+*   `halt()`: ISO14443-A HALT 命令。
 *   `select(cl_level, uid)`: ISO14443-A SELECT。
 *   `anticoll(cl_level, nvb, uid_prefix)`: ISO14443-A ANTICOLL。
 *   `field_on()` / `field_off()`: RF 场控制。
@@ -34,7 +35,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 
 *   `trace.set_layer(layer, enable)`: 开启/关闭追踪层 ("DRIVER", "PROTOCOL")。
 *   `trace.set_level(level)`: 设置日志级别 ("INFO", "DEBUG", "ERROR")。
-*   `trace.info(msg)` / `trace.error(msg)` / `trace.debug(msg)`: 输出日志。
+*   `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)`: 输出日志。
 
 ### `__init__.py`: 模块入口
 导入所有子模块，自动导出公共函数。通过 `from nfc import *` 可导入全部工具，包括 `trace` 模块。
@@ -43,6 +44,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `ASSERT_EQUAL(actual, expected, msg=None)`: 相等断言。
 *   `ASSERT_LEN(data, expected_len, msg=None)`: 长度断言。
 *   `ASSERT_IS_NOT_NONE(value, msg=None)`: 非空断言。
+*   `ASSERT_IS_NONE(value, msg=None)`: 空值断言。
 
 ### `bits.py`: 位操作工具
 *   `BITS_UPDATE(val, mask, data)`: Read-Modify-Write。
@@ -62,11 +64,13 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 ### `cli.py`: CLI 入口
 命令行入口，支持以下参数：
 *   `nfcscript <script_path>`: 运行脚本。
-*   `-p, --port`: 指定串口号 (默认: COM20)。
-*   `-r, --reader`: 指定读卡器类型 (默认: pn532)。
+*   `-p, --port`: 指定串口号 (必须通过参数、环境变量或 `.env` 配置)。
+*   `-r, --reader`: 指定读卡器类型 (必须通过参数、环境变量或 `.env` 配置)。
 *   `--trace-driver`: 开启 DRIVER 层追踪。
 *   `--trace-protocol`: 开启 PROTOCOL 层追踪。
 *   `--trace-level`: 设置日志级别 (默认: INFO)。
+
+环境变量优先级: CLI 参数 > `.env` 文件 > 系统环境变量 > 硬编码默认值。
 
 ## 4. 依赖关系
 

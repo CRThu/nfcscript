@@ -83,12 +83,85 @@ with session() as reader:
 | `checksum.py` | 校验工具 |
 | `delay.py` | 延时工具 |
 
+## API 参考
+
+### reader.py
+
+| 函数 | 说明 |
+|------|------|
+| `connect(port, reader_type)` | 连接读卡器 |
+| `get_reader()` | 获取当前读卡器实例 |
+| `active(ll, ignore_error)` | 寻卡，返回 uid/atq/sak |
+| `transceive(data, tx_crc, rx_crc)` | 底层帧交互 |
+| `transceive_bits(data, last_tx_bits, tx_crc, rx_crc)` | 位控制帧交互 |
+| `reqa()` | ISO14443-A REQA |
+| `wupa()` | ISO14443-A WUPA |
+| `halt()` | ISO14443-A HALT |
+| `select(cl_level, uid)` | ISO14443-A SELECT |
+| `anticoll(cl_level, nvb, uid_prefix)` | ISO14443-A ANTICOLL |
+| `field_on()` / `field_off()` | RF 场控制 |
+| `session(port, reader_type)` | 上下文管理器 |
+| `close()` | 断开连接 |
+
+### trace.py
+
+| 函数 | 说明 |
+|------|------|
+| `trace.set_layer(layer, enable)` | 开启/关闭追踪层 |
+| `trace.set_level(level)` | 设置日志级别 |
+| `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)` | 输出日志 |
+
+### assertions.py
+
+| 函数 | 说明 |
+|------|------|
+| `ASSERT_EQUAL(expected, actual, msg)` | 相等断言 |
+| `ASSERT_LEN(data, expected_len, msg)` | 长度断言 |
+| `ASSERT_IS_NOT_NONE(value, msg)` | 非空断言 |
+| `ASSERT_IS_NONE(value, msg)` | 空值断言 |
+
+### bits.py
+
+| 函数 | 说明 |
+|------|------|
+| `BITS_UPDATE(val, mask, data)` | Read-Modify-Write |
+| `BITS_SET(val, mask)` | 置位 |
+| `BITS_RESET(val, mask)` | 清位 |
+
+### hex_util.py
+
+| 函数 | 说明 |
+|------|------|
+| `PARSE_HEX(text)` | 解析 hex 字符串 |
+| `FORMAT_HEX(data, last_bits)` | 格式化为可视化 hex |
+
+### checksum.py
+
+| 函数 | 说明 |
+|------|------|
+| `GET_BCC(data)` | 计算异或校验 |
+
+### delay.py
+
+| 函数 | 说明 |
+|------|------|
+| `DELAY_MS(ms)` | 毫秒延时 |
+
 ## 环境变量
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `NFC_PORT` | 串口号 | `COM20` |
-| `NFC_READER` | 读卡器类型 | `pn532` |
+优先级: CLI 参数 > `.env` 文件 > 系统环境变量 (必须配置，否则报错)
+
+| 变量 | 说明 |
+|------|------|
+| `NFC_PORT` | 串口号 |
+| `NFC_READER` | 读卡器类型 |
+
+在项目根目录创建 `.env` 文件进行持久化配置：
+
+```
+NFC_PORT=COM20
+NFC_READER=pn532
+```
 
 ## 开发
 

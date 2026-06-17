@@ -47,13 +47,20 @@ def connect(port: str = None, reader_type: str = None):
     连接并初始化读卡器。
 
     Args:
-        port: 串口号，默认从环境变量 NFC_PORT 读取，若未设置则为 "COM20"。
-        reader_type: 读卡器类型，默认从环境变量 NFC_READER 读取，若未设置则为 "pn532"。
+        port: 串口号，若未指定则从环境变量 NFC_PORT 读取。
+        reader_type: 读卡器类型，若未指定则从环境变量 NFC_READER 读取。
+
+    Raises:
+        ValueError: 未提供 port 或 reader_type 且环境变量未设置。
     """
     if port is None:
-        port = os.environ.get("NFC_PORT", "COM20")
+        port = os.environ.get("NFC_PORT")
     if reader_type is None:
-        reader_type = os.environ.get("NFC_READER", "pn532")
+        reader_type = os.environ.get("NFC_READER")
+    if port is None:
+        raise ValueError("未指定串口，请通过 -p 参数、connect(port=...) 或 NFC_PORT 环境变量配置")
+    if reader_type is None:
+        raise ValueError("未指定读卡器类型，请通过 -r 参数、connect(reader_type=...) 或 NFC_READER 环境变量配置")
     _state.connect(port, reader_type)
 
 
@@ -259,9 +266,13 @@ def session(port: str = None, reader_type: str = None):
             card_info = reader.find()
     """
     if port is None:
-        port = os.environ.get("NFC_PORT", "COM20")
+        port = os.environ.get("NFC_PORT")
     if reader_type is None:
-        reader_type = os.environ.get("NFC_READER", "pn532")
+        reader_type = os.environ.get("NFC_READER")
+    if port is None:
+        raise ValueError("未指定串口，请通过 session(port=...) 或 NFC_PORT 环境变量配置")
+    if reader_type is None:
+        raise ValueError("未指定读卡器类型，请通过 session(reader_type=...) 或 NFC_READER 环境变量配置")
     _state.connect(port, reader_type)
     try:
         yield _state.reader
