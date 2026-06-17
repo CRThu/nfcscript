@@ -22,6 +22,9 @@ testpaths = ["tests"]
 [tool.uv]
 package = true
 
+[tool.uv.sources]
+nfctester = { workspace = true }
+
 [dependency-groups]
 dev = [
     "pytest",

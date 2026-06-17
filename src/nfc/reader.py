@@ -1,15 +1,13 @@
-from typing import Any
-
+from nfctester.registry import CardReaderRegistry, CardRegistry
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
 from .checksum import GET_BCC
 from .hex_util import FORMAT_HEX
-from nfctester.hardware.serial_transport import SerialTransport
-from nfctester.drivers.pn532_hsu import PN532_HSU
 
 # Global state
-_transport: SerialTransport | None = None
-_driver: PN532_HSU | None = None
+_reader = None
+_driver = None
 _is_connected = False
+
 
 def connect(port="COM20"):
     """
@@ -18,12 +16,13 @@ def connect(port="COM20"):
     Args:
         port: 串口号，默认为 "COM20"。
     """
-    global _transport, _driver, _is_connected
-    _transport = SerialTransport(port=port)
-    _driver = PN532_HSU(_transport)
-    _driver.connect()
+    global _reader, _driver, _is_connected
+    _reader = CardReaderRegistry.create("pn532", transport="serial", port=port)
+    _driver = _reader
+    _reader.connect()
     _is_connected = True
-    print(f"Connected to PN532 on {_transport.ser.port}")
+    print(f"Connected to PN532 on port {port}")
+
 
 def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
     """
@@ -43,7 +42,7 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
               - 'raw' (bytes): PN532 返回的原始响应数据。
     """
     ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected. Call connect() first.")
-        
+
     if not ll:
         return _driver.find()
     else:
@@ -53,7 +52,7 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
         if not res_reqa:
             return None
         atq = bytes(res_reqa[0])
-        
+
         # 2. 抗冲突与选择
         full_uid = []
         sak = 0
@@ -61,29 +60,31 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
             res = anticoll(cl_level=cl, nvb=0x20)
             if not res or not res[0]:
                 return None
-                
+
             data = res[0]
             # 只有当有数据时才进行长度校验
             if len(data) > 0:
                 ASSERT_LEN(data, 5, msg=f"CL{cl} 抗冲突返回数据长度不符: {FORMAT_HEX(data)}")
-                
+
                 # 计算期望的 BCC
                 expected_bcc = GET_BCC(data[0:4])
-                
+
                 if not ignore_error:
                     ASSERT_EQUAL(expected_bcc, data[4], msg=f"CL{cl} BCC 校验失败: data={FORMAT_HEX(data)}")
                 elif data[4] != expected_bcc:
                     print(f"Warning: CL{cl} BCC 校验失败")
-            
+
             has_next = (data[0] == 0x88)
             uid_to_select = data[0:5]
             sak_res = select(cl_level=cl, uid=uid_to_select)
-            
+
             # SAK 校验
             if not sak_res:
-                if not ignore_error: ASSERT_IS_NOT_NONE(sak_res, msg=f"CL{cl} SAK 选择失败")
-                else: print(f"Warning: CL{cl} SAK 选择失败")
-            
+                if not ignore_error:
+                    ASSERT_IS_NOT_NONE(sak_res, msg=f"CL{cl} SAK 选择失败")
+                else:
+                    print(f"Warning: CL{cl} SAK 选择失败")
+
             if has_next:
                 full_uid.extend(data[1:4])
             else:
@@ -91,15 +92,16 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
                 # 记录最后一次 SELECT 的 SAK
                 sak = sak_res[0] if sak_res else 0
                 break
-        
+
         # 返回兼容的字典格式
         return {
             'uid': bytes(full_uid),
             'atq': atq,
             'sak': sak,
-            'raw': bytes(full_uid) # 兼容原有的 raw 字段
+            'raw': bytes(full_uid)  # 兼容原有的 raw 字段
         }
-    
+
+
 def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> list[int]:
     """
     使用底层帧交互方式发送数据。
@@ -117,6 +119,7 @@ def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> lis
     res = _driver.transceive(bytes(data))
     # print(f"transceive: {FORMAT_HEX(data)}")
     return list(res) if res is not None else []
+
 
 def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> tuple[list[int], int]:
     """
@@ -139,20 +142,24 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
     # print(f"transceive: {FORMAT_HEX(data, last_tx_bits)}")
     return (list(res) if res is not None else []), _driver.last_rx_bits
 
+
 def reqa() -> tuple[list[int], int] | None:
     """ISO14443-A REQA (7 bits)"""
     # REQA: 0x26，短帧，仅发送 7 bits，响应无 CRC
     return transceive_bits([0x26], last_tx_bits=7, tx_crc=False, rx_crc=False)
+
 
 def wupa() -> tuple[list[int], int] | None:
     """ISO14443-A WUPA (7 bits)"""
     # WUPA: 0x52，短帧，仅发送 7 bits，响应无 CRC
     return transceive_bits([0x52], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
+
 def halt() -> list[int] | None:
     """ISO14443-A HALT (Standard Frame)"""
     # HALT: 0x50 0x00 + CRC
     return transceive([0x50, 0x00], tx_crc=True, rx_crc=True)
+
 
 def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> tuple[list[int], int] | None:
     """
@@ -166,6 +173,7 @@ def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> tupl
     # 抗冲突响应无 CRC
     return transceive_bits(cmd, last_tx_bits=0, tx_crc=False, rx_crc=False)
 
+
 def select(cl_level: int, uid: list[int]) -> list[int] | None:
     """
     ISO14443-A SELECT (Standard Frame)
@@ -176,15 +184,18 @@ def select(cl_level: int, uid: list[int]) -> list[int] | None:
     # 选择帧需带 CRC
     return transceive(cmd, tx_crc=True, rx_crc=True)
 
+
 def field_on():
     """开启 PN532 的 RF 场。"""
     ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected.")
     _driver.set_rf_field(True)
 
+
 def field_off():
     """关闭 PN532 的 RF 场。"""
     ASSERT_IS_NOT_NONE(_driver, msg="NFC driver not connected.")
     _driver.set_rf_field(False)
+
 
 def close():
     """
