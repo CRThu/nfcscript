@@ -28,19 +28,16 @@ def main():
         print(f"Error: Script not found: {args.script}")
         sys.exit(1)
 
-    load_dotenv()
+    script_dir = os.path.dirname(os.path.abspath(args.script))
+    script_env = os.path.join(script_dir, ".env")
+    if os.path.exists(script_env):
+        load_dotenv(script_env, override=False)
+    load_dotenv(override=False)
 
     if args.port is not None:
         os.environ["NFC_PORT"] = args.port
     if args.reader is not None:
         os.environ["NFC_READER"] = args.reader
-
-    if not os.environ.get("NFC_PORT"):
-        print("Error: 未指定串口，请通过 -p 参数或 NFC_PORT 环境变量/.env 文件配置")
-        sys.exit(1)
-    if not os.environ.get("NFC_READER"):
-        print("Error: 未指定读卡器类型，请通过 -r 参数或 NFC_READER 环境变量/.env 文件配置")
-        sys.exit(1)
 
     from nfc import trace
     if args.trace_driver:
