@@ -17,7 +17,8 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 ### `reader.py`: 全局函数接口
 提供模块级函数，封装底层 nfctester 操作：
 
-*   `connect(port="COM20")`: 通过 `CardReaderRegistry.create("pn532", transport="serial", port=port)` 创建并连接读卡器。
+*   `connect(port=None)`: 通过 `CardReaderRegistry.create("pn532", transport="serial", port=port)` 创建并连接读卡器。默认从环境变量 `NFC_PORT` 读取端口。
+*   `get_reader()`: 获取当前连接的读卡器实例，供 Card 类使用。
 *   `active(ll=False, ignore_error=False)`: 寻卡，返回 `dict`（含 `uid`, `atq`, `sak`）。
 *   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。
 *   `transceive_bits(data, last_tx_bits=0, ...)`: 支持位控制的帧交互。
@@ -25,15 +26,23 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `select(cl_level, uid)`: ISO14443-A SELECT。
 *   `anticoll(cl_level, nvb, uid_prefix)`: ISO14443-A ANTICOLL。
 *   `field_on()` / `field_off()`: RF 场控制。
+*   `session(port=None)`: 上下文管理器，自动管理连接生命周期。
 *   `close()`: 断开连接。
 
+### `trace.py`: 日志追踪模块
+包装 `nfctester.trace`，提供日志控制功能：
+
+*   `trace.set_layer(layer, enable)`: 开启/关闭追踪层 ("DRIVER", "PROTOCOL")。
+*   `trace.set_level(level)`: 设置日志级别 ("INFO", "DEBUG", "ERROR")。
+*   `trace.info(msg)` / `trace.error(msg)` / `trace.debug(msg)`: 输出日志。
+
 ### `__init__.py`: 模块入口
-导入所有子模块，自动导出公共函数。
+导入所有子模块，自动导出公共函数。通过 `from nfc import *` 可导入全部工具，包括 `trace` 模块。
 
 ### `assertions.py`: 测试断言工具
-*   `ASSERT_EQUAL(actual, expected)`: 相等断言。
-*   `ASSERT_LEN(data, expected_len)`: 长度断言。
-*   `ASSERT_IS_NOT_NONE(value)`: 非空断言。
+*   `ASSERT_EQUAL(actual, expected, msg=None)`: 相等断言。
+*   `ASSERT_LEN(data, expected_len, msg=None)`: 长度断言。
+*   `ASSERT_IS_NOT_NONE(value, msg=None)`: 非空断言。
 
 ### `bits.py`: 位操作工具
 *   `BITS_UPDATE(val, mask, data)`: Read-Modify-Write。
@@ -51,7 +60,13 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `DELAY_MS(ms)`: 毫秒延时。
 
 ### `cli.py`: CLI 入口
-*   命令行入口 `nfcscript <script_path>`。
+命令行入口，支持以下参数：
+*   `nfcscript <script_path>`: 运行脚本。
+*   `-p, --port`: 指定串口号 (默认: COM20)。
+*   `-r, --reader`: 指定读卡器类型 (默认: pn532)。
+*   `--trace-driver`: 开启 DRIVER 层追踪。
+*   `--trace-protocol`: 开启 PROTOCOL 层追踪。
+*   `--trace-level`: 设置日志级别 (默认: INFO)。
 
 ## 4. 依赖关系
 
@@ -61,7 +76,8 @@ nfcscript
             ├── registry (TransportRegistry, CardReaderRegistry, CardRegistry)
             ├── hardware (SerialTransport)
             ├── drivers (PN532_HSU)
-            └── cards (NTAG21x, NTAG224, MifareClassicCard, Type2Tag)
+            ├── cards (NTAG21x, NTAG224, MifareClassicCard, Type2Tag)
+            └── trace (TraceManager, loguru)
 ```
 
 ## 5. 开发规范
@@ -72,8 +88,9 @@ nfcscript
 
 ## 6. 调试指南
 *   检查注册表: `from nfctester.registry import CardRegistry; print(CardRegistry.list())`
-*   检查连接: `connect()` 后检查 `_driver` 是否为 `None`。
-*   通信日志: 由底层 `nfctester.trace` 模块处理。
+*   检查连接: `connect()` 后检查 `_reader` 是否为 `None`。
+*   开启追踪: 使用 CLI 参数 `--trace-driver --trace-protocol` 或在脚本中调用 `trace.set_layer()`。
+*   通信日志: 由底层 `nfctester.trace` 模块处理，支持 DRIVER 和 PROTOCOL 两层。
 
 ---
 *保持架构简单。nfcscript 是 nfctester 的 DSL 薄封装层，不是独立的插件系统。*

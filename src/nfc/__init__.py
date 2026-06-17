@@ -4,3 +4,4 @@ from .assertions import *
 from .bits import *
 from .hex_util import *
 from .checksum import *
+from . import trace

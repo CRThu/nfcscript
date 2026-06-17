@@ -1,3 +1,4 @@
+import os
 from contextlib import contextmanager
 from nfctester.registry import CardReaderRegistry
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
@@ -21,11 +22,11 @@ class _NFCState:
     def reader(self):
         return self._reader
 
-    def connect(self, port: str = "COM20"):
-        self._reader = CardReaderRegistry.create("pn532", transport="serial", port=port)
+    def connect(self, port: str = "COM20", reader_type: str = "pn532"):
+        self._reader = CardReaderRegistry.create(reader_type, transport="serial", port=port)
         self._reader.connect()
         self._connected = True
-        print(f"Connected to PN532 on port {port}")
+        print(f"Connected to {reader_type.upper()} on port {port}")
 
     def disconnect(self):
         if self._connected and self._reader:
@@ -41,14 +42,19 @@ class _NFCState:
 _state = _NFCState()
 
 
-def connect(port: str = "COM20"):
+def connect(port: str = None, reader_type: str = None):
     """
-    连接并初始化 PN532 读卡器。
+    连接并初始化读卡器。
 
     Args:
-        port: 串口号，默认为 "COM20"。
+        port: 串口号，默认从环境变量 NFC_PORT 读取，若未设置则为 "COM20"。
+        reader_type: 读卡器类型，默认从环境变量 NFC_READER 读取，若未设置则为 "pn532"。
     """
-    _state.connect(port)
+    if port is None:
+        port = os.environ.get("NFC_PORT", "COM20")
+    if reader_type is None:
+        reader_type = os.environ.get("NFC_READER", "pn532")
+    _state.connect(port, reader_type)
 
 
 def get_reader():
@@ -244,7 +250,7 @@ def close():
 
 
 @contextmanager
-def session(port: str = "COM20"):
+def session(port: str = None, reader_type: str = None):
     """
     上下文管理器，自动管理连接生命周期。
 
@@ -252,7 +258,11 @@ def session(port: str = "COM20"):
         with session("COM20") as reader:
             card_info = reader.find()
     """
-    _state.connect(port)
+    if port is None:
+        port = os.environ.get("NFC_PORT", "COM20")
+    if reader_type is None:
+        reader_type = os.environ.get("NFC_READER", "pn532")
+    _state.connect(port, reader_type)
     try:
         yield _state.reader
     finally:
