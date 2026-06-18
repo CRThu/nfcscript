@@ -70,7 +70,17 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `--trace-protocol`: 开启 PROTOCOL 层追踪。
 *   `--trace-level`: 设置日志级别 (默认: INFO)。
 
-环境变量优先级: CLI 参数 > `.env` 文件 > 系统环境变量 > 硬编码默认值。
+环境变量优先级: CLI 参数 > 内层 `.env` > 外层 `.env` > 系统环境变量 > 硬编码默认值。
+
+支持多层 `.env` 加载：从脚本目录向上搜索所有 `.env` 文件，按从外到内的顺序依次加载（内层覆盖外层同名变量）。
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `NFC_PORT` | 串口号 | - |
+| `NFC_READER` | 读卡器类型 | - |
+| `NFC_TRACE_LEVEL` | 日志级别 | `INFO` |
+| `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
+| `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
 
 ## 4. 依赖关系
 

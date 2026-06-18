@@ -149,18 +149,31 @@ with session() as reader:
 
 ## 环境变量
 
-优先级: CLI 参数 > `.env` 文件 > 系统环境变量 (必须配置，否则报错)
+优先级: CLI 参数 > 内层 `.env` > 外层 `.env` > 系统环境变量 (必须配置，否则报错)
 
-| 变量 | 说明 |
-|------|------|
-| `NFC_PORT` | 串口号 |
-| `NFC_READER` | 读卡器类型 |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `NFC_PORT` | 串口号 | - |
+| `NFC_READER` | 读卡器类型 | - |
+| `NFC_TRACE_LEVEL` | 日志级别 | `INFO` |
+| `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
+| `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
 
-在项目根目录创建 `.env` 文件进行持久化配置：
+支持多层 `.env` 加载：从脚本目录向上搜索所有 `.env` 文件，按从外到内的顺序依次加载（内层覆盖外层同名变量）。
+
+例如，脚本位于 `/project/tests/run.py`，沿途有 `/project/.env` 和 `/project/tests/.env`，加载顺序为：
+
+1. `/project/.env` (基础配置)
+2. `/project/tests/.env` (覆盖基础配置中的同名变量)
+
+在项目根目录或脚本所在目录创建 `.env` 文件进行持久化配置：
 
 ```
 NFC_PORT=COM20
 NFC_READER=pn532
+NFC_TRACE_LEVEL=DEBUG
+NFC_TRACE_DRIVER=true
+NFC_TRACE_PROTOCOL=true
 ```
 
 ## 开发
