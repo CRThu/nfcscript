@@ -10,13 +10,13 @@ uv sync
 
 ## 使用
 
-### 基本用法
+### nfcscript - 脚本执行
 
 ```bash
 nfcscript test_card.py
 ```
 
-### 常用参数
+#### 常用参数
 
 ```bash
 # 指定串口
@@ -33,6 +33,51 @@ nfcscript test_card.py --trace-level DEBUG
 
 # 组合使用
 nfcscript test_card.py -p COM21 -r pn532 --trace-driver --trace-protocol --trace-level DEBUG
+```
+
+### nfc-cli - 交互式命令行
+
+```bash
+# 列出所有可用卡片类型
+nfc-cli --list-cards
+
+# 连接卡片并进入交互模式
+nfc-cli -c ntag224 -p COM21
+
+# 指定读卡器类型
+nfc-cli -c mifare_classic -p COM21 -r pn532
+```
+
+#### 交互命令
+
+进入交互模式后，可以输入命令操作卡片：
+
+```
+> help              # 显示可用命令
+> auth 7 FFFFFFFFFFFF  # 认证块 7
+> read 10           # 读取页 10
+> write 20 AABBCCDD... # 写入页 20
+> quit              # 退出
+```
+
+支持的值格式：
+- 十六进制: `0xFF`, `0xAABBCCDD`
+- 十进制: `7`, `255`
+- 字节串: `b'\xff\x00'`
+
+#### 示例
+
+```bash
+# NTAG224 认证并读取
+nfc-cli -c ntag224 -p COM21
+> auth 1 AABBCCDD112233445566778899001122
+> read 4
+
+# Mifare Classic 操作
+nfc-cli -c mifare_classic -p COM21
+> authenticate 7 FFFFFFFFFFFF
+> read_block 8
+> write_block 9 AABBCCDD112233445566778899001122
 ```
 
 ### 脚本示例
