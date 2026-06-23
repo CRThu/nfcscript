@@ -46,6 +46,13 @@ nfc-cli -c ntag224 -p COM21
 
 # 指定读卡器类型
 nfc-cli -c mifare_classic -p COM21 -r pn532
+
+# 通过环境变量自动发现外部卡片
+export NFC_CARD_PATH="../scripts/lib"
+nfc-cli -c sm7 -p COM20
+
+# 或手动指定
+nfc-cli -c sm7 -p COM20 -i ../scripts/lib
 ```
 
 #### 交互命令
@@ -64,6 +71,20 @@ nfc-cli -c mifare_classic -p COM21 -r pn532
 - 十六进制: `0xFF`, `0xAABBCCDD`
 - 十进制: `7`, `255`
 - 字节串: `b'\xff\x00'`
+
+#### 导入外部卡片
+
+使用 `-i` 参数导入外部卡片模块，支持单个 `.py` 文件或包含 `__init__.py` 的目录：
+
+```bash
+# 导入单个文件
+nfc-cli -c my_card -p COM20 -i /path/to/my_card.py
+
+# 导入目录（需要有 __init__.py）
+nfc-cli -c sm7 -p COM20 -i /path/to/lib
+```
+
+外部卡片模块需要使用 `@CardRegistry.register("name")` 装饰器注册。
 
 #### 示例
 
@@ -203,6 +224,7 @@ with session() as reader:
 | `NFC_TRACE_LEVEL` | 日志级别 | `INFO` |
 | `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
 | `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
+| `NFC_CARD_PATH` | 外部卡片模块搜索路径 (分号分隔) | - |
 
 支持多层 `.env` 加载：从脚本目录向上搜索所有 `.env` 文件，按从外到内的顺序依次加载（内层覆盖外层同名变量）。
 

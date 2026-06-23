@@ -1,9 +1,44 @@
 import argparse
+import importlib
 import inspect
+import os
 import sys
 
 from nfc import *
 from nfctester.registry import CardRegistry
+
+
+def _load_external_cards(paths):
+    """加载外部卡片模块，触发 @CardRegistry.register() 注册"""
+    for path in paths:
+        path = os.path.abspath(path)
+        if path.endswith(".py"):
+            module_name = os.path.splitext(os.path.basename(path))[0]
+            sys.path.insert(0, os.path.dirname(path))
+        elif os.path.isdir(path):
+            module_name = os.path.basename(path)
+            sys.path.insert(0, os.path.dirname(path))
+        else:
+            continue
+
+        try:
+            importlib.import_module(module_name)
+            print(f"已加载: {module_name}")
+        except Exception as e:
+            print(f"加载 {module_name} 失败: {e}")
+
+
+def _discover_external_cards():
+    """从 NFC_CARD_PATH 环境变量自动发现并加载外部卡片"""
+    card_path = os.environ.get("NFC_CARD_PATH")
+    if not card_path:
+        return
+
+    # 支持多个路径，用分号分隔 (Windows) 或冒号分隔 (Unix)
+    separator = ";" if os.name == "nt" else ":"
+    paths = [p.strip() for p in card_path.split(separator) if p.strip()]
+    if paths:
+        _load_external_cards(paths)
 
 
 def _get_methods(card):
@@ -89,9 +124,17 @@ def main():
     parser.add_argument("-c", "--card", default=None, help="卡片类型 (如: mifare_classic, ntag224, sm7)")
     parser.add_argument("-p", "--port", default=None, help="串口号")
     parser.add_argument("-r", "--reader", default=None, help="读卡器类型 (默认: pn532)")
+    parser.add_argument("-i", "--import", dest="imports", nargs="*", default=[], help="导入外部卡片模块 (文件或目录路径)")
     parser.add_argument("--list-cards", action="store_true", help="列出所有可用的卡片类型")
 
     args = parser.parse_args()
+
+    # 从环境变量自动发现外部卡片
+    _discover_external_cards()
+
+    # 手动指定的外部卡片
+    if args.imports:
+        _load_external_cards(args.imports)
 
     if args.list_cards:
         print("可用卡片类型:")

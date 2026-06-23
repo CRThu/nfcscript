@@ -75,7 +75,7 @@ def get_reader():
     return _state.reader
 
 
-def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
+def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -> dict | None:
     """
     寻卡操作，检测并激活目标卡片。
 
@@ -83,6 +83,8 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
         ll: 如果为 True，则执行底层抗冲突流程以兼容非标卡；
             如果为 False，则使用 PN532 原生 find()。
         ignore_error: 如果为 True，当 BCC 或 SAK 校验失败时，记录警告而不停止执行。
+        reqa_cmd: 底层寻卡时使用的 REQA 命令字节，默认 0x26。
+                  仅在 ll=True 时生效。
 
     Returns:
         dict: 包含卡片信息的字典，失败时返回 None。
@@ -100,7 +102,7 @@ def active(ll: bool = False, ignore_error: bool = False) -> dict | None:
 
     # 手动底层寻卡流程
     # 1. REQA
-    res_reqa = reqa()
+    res_reqa = reqa(cmd=reqa_cmd)
     if not res_reqa:
         return None
     atq = bytes(res_reqa[0])
@@ -195,10 +197,10 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
     return (list(res) if res is not None else []), reader.last_rx_bits
 
 
-def reqa() -> tuple[list[int], int] | None:
+def reqa(cmd: int = 0x5a) -> tuple[list[int], int] | None:
     """ISO14443-A REQA (7 bits)"""
     # REQA: 0x26，短帧，仅发送 7 bits，响应无 CRC
-    return transceive_bits([0x26], last_tx_bits=7, tx_crc=False, rx_crc=False)
+    return transceive_bits([cmd], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
 
 def wupa() -> tuple[list[int], int] | None:
