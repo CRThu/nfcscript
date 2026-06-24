@@ -1,9 +1,18 @@
 import os
 from contextlib import contextmanager
+from typing import NamedTuple
 from nfctester.registry import CardReaderRegistry
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
 from .checksum import GET_BCC
 from .hex_util import FORMAT_HEX
+
+
+class TransceiveResult(NamedTuple):
+    """transceive_bits 返回结果"""
+    data: list[int]
+    """接收到的数据字节列表"""
+    bits: int
+    """最后一个字节的有效位数 (0 = 完整字节)"""
 
 
 class _NFCState:
@@ -105,16 +114,16 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
     res_reqa = reqa(cmd=reqa_cmd)
     if not res_reqa:
         return None
-    atq = res_reqa[0]
+    atq = res_reqa.data
 
     # 2. 抗冲突与选择
     full_uid = []
     for cl in [1, 2, 3]:
         res = anticoll(cl_level=cl, nvb=0x20)
-        if not res or not res[0]:
+        if not res or not res.data:
             return None
 
-        data = res[0]
+        data = res.data
         # 只有当有数据时才进行长度校验
         if len(data) > 0:
             ASSERT_LEN(data, 5, msg=f"CL{cl} 抗冲突返回数据长度不符: {FORMAT_HEX(data)}")
@@ -175,7 +184,7 @@ def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> lis
     return list(res) if res is not None else []
 
 
-def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> tuple[list[int], int]:
+def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> TransceiveResult | None:
     """
     使用底层帧交互方式发送数据，并支持对最后一个字节进行位控制。
 
@@ -187,23 +196,24 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
         rx_crc: 接收时是否自动校验 CRC。
 
     Returns:
-        tuple[list[int], int]: (接收到的数据字节列表, 最后一个字节的有效位数)。
-                               最后一个字节的有效位数 0 表示完整字节。
+        TransceiveResult | None: 包含 data 和 bits 属性，失败返回 None。
     """
     _state.ensure_connected()
     reader = _state.reader
     reader.set_crc(tx_crc, rx_crc)
     res = reader.transceive(bytes(data), last_tx_bits=last_tx_bits)
-    return (list(res) if res is not None else []), reader.last_rx_bits
+    if res is None:
+        return None
+    return TransceiveResult(data=list(res), bits=reader.last_rx_bits)
 
 
-def reqa(cmd: int = 0x26) -> tuple[list[int], int] | None:
+def reqa(cmd: int = 0x26) -> TransceiveResult | None:
     """ISO14443-A REQA (7 bits)"""
     # REQA: 0x26，短帧，仅发送 7 bits，响应无 CRC
     return transceive_bits([cmd], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
 
-def wupa() -> tuple[list[int], int] | None:
+def wupa() -> TransceiveResult | None:
     """ISO14443-A WUPA (7 bits)"""
     # WUPA: 0x52，短帧，仅发送 7 bits，响应无 CRC
     return transceive_bits([0x52], last_tx_bits=7, tx_crc=False, rx_crc=False)
@@ -215,15 +225,23 @@ def halt() -> list[int] | None:
     return transceive([0x50, 0x00], tx_crc=True, rx_crc=True)
 
 
-def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> tuple[list[int], int] | None:
+def _get_sel_cmd(cl_level: int) -> int:
+    """根据 CL 级别获取 ISO14443-A SEL 命令字节"""
+    sel_map = {1: 0x93, 2: 0x95, 3: 0x97}
+    if cl_level not in sel_map:
+        raise ValueError(f"Invalid CL level: {cl_level}, must be 1, 2, or 3")
+    return sel_map[cl_level]
+
+
+def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> TransceiveResult | None:
     """
     ISO14443-A ANTICOLL (Anti-collision)
-    :param cl_level: 1 (0x93) or 2 (0x95)
+    :param cl_level: 1 (0x93), 2 (0x95), or 3 (0x97)
     :param nvb: Number of Valid Bits，定义了包含 SEL 和 NVB 在内的有效位数
     :param uid_prefix: 已知的部分 UID (0-4 字节)
-    :return: (响应数据, last_rx_bits)
+    :return: TransceiveResult 包含 data 和 bits 属性
     """
-    cmd = [0x93 if cl_level == 1 else 0x95, nvb] + uid_prefix
+    cmd = [_get_sel_cmd(cl_level), nvb] + uid_prefix
     # 抗冲突响应无 CRC
     return transceive_bits(cmd, last_tx_bits=0, tx_crc=False, rx_crc=False)
 
@@ -231,10 +249,10 @@ def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> tupl
 def select(cl_level: int, uid: list[int]) -> list[int] | None:
     """
     ISO14443-A SELECT (Standard Frame)
-    :param cl_level: 1 (0x93) or 2 (0x95)
+    :param cl_level: 1 (0x93), 2 (0x95), or 3 (0x97)
     :param uid: 完整 5 字节 UID (包含 BCC)
     """
-    cmd = [0x93 if cl_level == 1 else 0x95, 0x70] + uid
+    cmd = [_get_sel_cmd(cl_level), 0x70] + uid
     # 选择帧需带 CRC
     return transceive(cmd, tx_crc=True, rx_crc=True)
 

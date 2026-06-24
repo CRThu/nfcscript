@@ -21,7 +21,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `get_reader()`: 获取当前连接的读卡器实例，供 Card 类使用。
 *   `active(ll=False, ignore_error=False)`: 寻卡，返回 `dict`（含 `uid`, `atq`, `sak`）。
 *   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。
-*   `transceive_bits(data, last_tx_bits=0, ...)`: 支持位控制的帧交互。
+*   `transceive_bits(data, last_tx_bits=0, ...)`: 支持位控制的帧交互，返回 `TransceiveResult` (含 `.data` 和 `.bits` 属性)。
 *   `reqa()` / `wupa()`: ISO14443-A 短帧命令。
 *   `halt()`: ISO14443-A HALT 命令。
 *   `select(cl_level, uid)`: ISO14443-A SELECT。
