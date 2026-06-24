@@ -197,7 +197,7 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
     return (list(res) if res is not None else []), reader.last_rx_bits
 
 
-def reqa(cmd: int = 0x5a) -> tuple[list[int], int] | None:
+def reqa(cmd: int = 0x26) -> tuple[list[int], int] | None:
     """ISO14443-A REQA (7 bits)"""
     # REQA: 0x26，短帧，仅发送 7 bits，响应无 CRC
     return transceive_bits([cmd], last_tx_bits=7, tx_crc=False, rx_crc=False)
