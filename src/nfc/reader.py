@@ -105,11 +105,10 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
     res_reqa = reqa(cmd=reqa_cmd)
     if not res_reqa:
         return None
-    atq = bytes(res_reqa[0])
+    atq = res_reqa[0]
 
     # 2. 抗冲突与选择
     full_uid = []
-    sak = 0
     for cl in [1, 2, 3]:
         res = anticoll(cl_level=cl, nvb=0x20)
         if not res or not res[0]:
@@ -128,6 +127,7 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
             elif data[4] != expected_bcc:
                 print(f"Warning: CL{cl} BCC 校验失败")
 
+        print(f"cl{cl}.uid: {FORMAT_HEX(data)}")
         has_next = (data[0] == 0x88)
         uid_to_select = data[0:5]
         sak_res = select(cl_level=cl, uid=uid_to_select)
@@ -143,14 +143,14 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
             full_uid.extend(data[1:4])
         else:
             full_uid.extend(data[0:4])
-            # 记录最后一次 SELECT 的 SAK
+            # SAK 为最后一次 SELECT 响应的第 1 个字节 (int)
             sak = sak_res[0] if sak_res else 0
             break
 
     # 返回兼容的字典格式
     return {
         'uid': bytes(full_uid),
-        'atq': atq,
+        'atq': bytes(atq),
         'sak': sak,
         'raw': bytes(full_uid),  # 兼容原有的 raw 字段
     }
