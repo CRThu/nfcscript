@@ -1,18 +1,10 @@
 import os
 from contextlib import contextmanager
-from typing import NamedTuple
+from nfctester.drivers.card_reader import CardInfo, TransceiveResult
 from nfctester.registry import CardReaderRegistry
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
 from .checksum import GET_BCC
 from .hex_util import FORMAT_HEX
-
-
-class TransceiveResult(NamedTuple):
-    """transceive_bits 返回结果"""
-    data: list[int]
-    """接收到的数据字节列表"""
-    bits: int
-    """最后一个字节的有效位数 (0 = 完整字节)"""
 
 
 class _NFCState:
@@ -33,13 +25,13 @@ class _NFCState:
 
     def connect(self, port: str = "COM20", reader_type: str = "pn532"):
         self._reader = CardReaderRegistry.create(reader_type, transport="serial", port=port)
-        self._reader.connect()
+        self._reader.open()
         self._connected = True
         print(f"Connected to {reader_type.upper()} on port {port}")
 
     def disconnect(self):
         if self._connected and self._reader:
-            self._reader.disconnect()
+            self._reader.close()
             self._connected = False
             self._reader = None
             print("Disconnected")
@@ -84,30 +76,29 @@ def get_reader():
     return _state.reader
 
 
-def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -> dict | None:
+def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -> CardInfo | None:
     """
     寻卡操作，检测并激活目标卡片。
 
     Args:
         ll: 如果为 True，则执行底层抗冲突流程以兼容非标卡；
-            如果为 False，则使用 PN532 原生 find()。
+            如果为 False，则使用读卡器原生 active()。
         ignore_error: 如果为 True，当 BCC 或 SAK 校验失败时，记录警告而不停止执行。
         reqa_cmd: 底层寻卡时使用的 REQA 命令字节，默认 0x26。
                   仅在 ll=True 时生效。
 
     Returns:
-        dict: 包含卡片信息的字典，失败时返回 None。
-              Key 说明:
+        CardInfo: 包含卡片信息的数据类，失败时返回 None。
+              属性说明:
               - 'uid' (bytes): 卡片的 UID。
               - 'atq' (bytes): 卡片的 ATQ (Answer To Request)。
               - 'sak' (int):   卡片的 SAK (Select Acknowledge)。
-              - 'raw' (bytes): PN532 返回的原始响应数据。
     """
     _state.ensure_connected()
     reader = _state.reader
 
     if not ll:
-        return reader.find()
+        return reader.active()
 
     # 手动底层寻卡流程
     # 1. REQA
@@ -138,7 +129,7 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
 
         print(f"cl{cl}.uid: {FORMAT_HEX(data)}")
         has_next = (data[0] == 0x88)
-        uid_to_select = data[0:5]
+        uid_to_select = list(data[0:5])
         sak_res = select(cl_level=cl, uid=uid_to_select)
 
         # SAK 校验
@@ -156,13 +147,7 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
             sak = sak_res[0] if sak_res else 0
             break
 
-    # 返回兼容的字典格式
-    return {
-        'uid': bytes(full_uid),
-        'atq': bytes(atq),
-        'sak': sak,
-        'raw': bytes(full_uid),  # 兼容原有的 raw 字段
-    }
+    return CardInfo(uid=bytes(full_uid), atq=bytes(atq), sak=sak)
 
 
 def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> list[int]:
@@ -179,9 +164,8 @@ def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> lis
     """
     _state.ensure_connected()
     reader = _state.reader
-    reader.set_crc(tx_crc, rx_crc)
-    res = reader.transceive(bytes(data))
-    return list(res) if res is not None else []
+    res = reader.transceive(bytes(data), tx_crc=tx_crc, rx_crc=rx_crc)
+    return list(res.data) if res and res.data else []
 
 
 def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> TransceiveResult | None:
@@ -196,15 +180,11 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
         rx_crc: 接收时是否自动校验 CRC。
 
     Returns:
-        TransceiveResult | None: 包含 data 和 bits 属性，失败返回 None。
+        TransceiveResult | None: 包含 data 和 rx_bits 属性，失败返回 None。
     """
     _state.ensure_connected()
     reader = _state.reader
-    reader.set_crc(tx_crc, rx_crc)
-    res = reader.transceive(bytes(data), last_tx_bits=last_tx_bits)
-    if res is None:
-        return None
-    return TransceiveResult(data=list(res), bits=reader.last_rx_bits)
+    return reader.transceive_bits(bytes(data), last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc)
 
 
 def reqa(cmd: int = 0x26) -> TransceiveResult | None:
@@ -239,7 +219,7 @@ def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> Tran
     :param cl_level: 1 (0x93), 2 (0x95), or 3 (0x97)
     :param nvb: Number of Valid Bits，定义了包含 SEL 和 NVB 在内的有效位数
     :param uid_prefix: 已知的部分 UID (0-4 字节)
-    :return: TransceiveResult 包含 data 和 bits 属性
+    :return: TransceiveResult 包含 data 和 rx_bits 属性
     """
     cmd = [_get_sel_cmd(cl_level), nvb] + uid_prefix
     # 抗冲突响应无 CRC
@@ -260,13 +240,13 @@ def select(cl_level: int, uid: list[int]) -> list[int] | None:
 def field_on():
     """开启 PN532 的 RF 场。"""
     _state.ensure_connected()
-    _state.reader.set_rf_field(True)
+    _state.reader.rf_field = True
 
 
 def field_off():
     """关闭 PN532 的 RF 场。"""
     _state.ensure_connected()
-    _state.reader.set_rf_field(False)
+    _state.reader.rf_field = False
 
 
 def close():
@@ -283,7 +263,7 @@ def session(port: str = None, reader_type: str = None):
 
     用法:
         with session("COM20") as reader:
-            card_info = reader.find()
+            card_info = reader.active()
     """
     if port is None:
         port = os.environ.get("NFC_PORT")
