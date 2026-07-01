@@ -181,7 +181,7 @@ with session() as reader:
 
 | 函数 | 说明 |
 |------|------|
-| `ASSERT_EQUAL(expected, actual, msg)` | 相等断言 |
+| `ASSERT_EQUAL(actual, expected, msg)` | 相等断言 |
 | `ASSERT_LEN(data, expected_len, msg)` | 长度断言 |
 | `ASSERT_IS_NOT_NONE(value, msg)` | 非空断言 |
 | `ASSERT_IS_NONE(value, msg)` | 空值断言 |
@@ -242,6 +242,16 @@ NFC_TRACE_LEVEL=DEBUG
 NFC_TRACE_DRIVER=true
 NFC_TRACE_PROTOCOL=true
 ```
+
+## AI 编写脚本
+
+本目录下 `SKILL.md` 提供了 DSL 的完整 API 参考和 few-shot 示例，可直接用于 AI Agent 生成 NFC 脚本。
+
+**使用方式**：在 AI 对话中引用该文件，例如：
+```
+@nfcscript/SKILL.md
+```
+Agent 会基于 SKILL.md 中的 API 签名、few-shot 示例和约定生成正确的脚本代码。
 
 ## 开发
 

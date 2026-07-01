@@ -100,7 +100,18 @@ nfcscript
 *   **严禁硬编码**: 不直接 `import` 具体的 Transport/Driver/Card 类，通过 Registry 动态获取。
 *   **Tooling**: 所有操作使用 `uv` 工具链。
 
-## 6. 调试指南
+## 6. AI 编写脚本指南
+
+本目录下 `SKILL.md` 是给 AI Agent（如 Codex、MiMo Code 等）的 DSL 使用手册，包含：
+- 完整 API 签名与说明
+- Few-shot 示例（基础脚本、位级别收发、自定义卡片驱动）
+- 关键约定（数据类型、返回值、脚本结构）
+
+**使用方式**：在对话中引用此文件，让 Agent 生成符合规范的脚本：
+- `@nfcscript/SKILL.md` — 将 skill 注入 Agent 上下文
+- Agent 会基于 API 参考和 few-shot 生成正确的 `from nfc import *` 脚本
+
+## 7. 调试指南
 *   检查注册表: `from nfctester.registry import CardRegistry; print(CardRegistry.list())`
 *   检查连接: `connect()` 后检查 `_reader` 是否为 `None`。
 *   开启追踪: 使用 CLI 参数 `--trace-driver --trace-protocol` 或在脚本中调用 `trace.set_layer()`。
