@@ -17,17 +17,18 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 ### `reader.py`: 全局函数接口
 提供模块级函数，封装底层 nfctester 操作：
 
-*   `connect(port=None)`: 通过 `CardReaderRegistry.create("pn532", transport="serial", port=port)` 创建并连接读卡器。默认从环境变量 `NFC_PORT` 读取端口。
+*   `connect(port=None, reader_type=None)`: 通过 `CardReaderRegistry.create()` 创建并连接读卡器。默认从环境变量 `NFC_PORT` / `NFC_READER` 读取。
 *   `get_reader()`: 获取当前连接的读卡器实例，供 Card 类使用。
-*   `active(ll=False, ignore_error=False)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。
-*   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。
-*   `transceive_bits(data, last_tx_bits=0, ...)`: 支持位控制的帧交互，返回 `TransceiveResult` (含 `.data` 和 `.rx_bits` 属性)。
-*   `reqa()` / `wupa()`: ISO14443-A 短帧命令。
+*   `active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`low_layer=True` 由 nfcscript 执行底层抗冲突流程，`reqa_cmd` 仅 `low_layer=True` 时生效。
+*   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
+*   `transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)`: 支持位控制的帧交互，返回 `TransceiveBits | None` (含 `.data` 和 `.bits` 属性)。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
+*   `reqa(cmd=0x26)`: ISO14443-A REQA 短帧命令。
+*   `wupa()`: ISO14443-A WUPA 短帧命令。
 *   `halt()`: ISO14443-A HALT 命令。
 *   `select(cl_level, uid)`: ISO14443-A SELECT。
-*   `anticoll(cl_level, nvb, uid_prefix)`: ISO14443-A ANTICOLL。
+*   `anticoll(cl_level, nvb=0x20, uid_prefix=[])`: ISO14443-A ANTICOLL。
 *   `field_on()` / `field_off()`: RF 场控制。
-*   `session(port=None)`: 上下文管理器，自动管理连接生命周期。
+*   `session(port=None, reader_type=None)`: 上下文管理器，自动管理连接生命周期。
 *   `close()`: 断开连接。
 
 ### `trace.py`: 日志追踪模块
@@ -35,13 +36,15 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 
 *   `trace.set_layer(layer, enable)`: 开启/关闭追踪层 ("DRIVER", "PROTOCOL")。
 *   `trace.set_level(level)`: 设置日志级别 ("INFO", "DEBUG", "ERROR")。
+*   `trace.set_parse(level=1)`: 设置解析级别 (0=关闭, 1=简单, 2=树状结构)。
+*   `trace.set_card_type(card_type)`: 设置卡片类型标识，注入到协议解析器。
 *   `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)`: 输出日志。
 
 ### `__init__.py`: 模块入口
 导入所有子模块，自动导出公共函数。通过 `from nfc import *` 可导入全部工具，包括 `trace` 模块。
 
 ### `assertions.py`: 测试断言工具
-*   `ASSERT_EQUAL(actual, expected, msg=None)`: 相等断言。
+*   `ASSERT_EQUAL(expected, actual, msg=None)`: 相等断言。
 *   `ASSERT_LEN(data, expected_len, msg=None)`: 长度断言。
 *   `ASSERT_IS_NOT_NONE(value, msg=None)`: 非空断言。
 *   `ASSERT_IS_NONE(value, msg=None)`: 空值断言。
@@ -53,7 +56,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 
 ### `hex_util.py`: 十六进制工具
 *   `PARSE_HEX(text)`: 解析带位标记的 hex 字符串。
-*   `FORMAT_HEX(data, last_bits)`: 格式化为可视化 hex。
+*   `FORMAT_HEX(data, last_bits=0)`: 格式化为可视化 hex。
 
 ### `checksum.py`: 校验工具
 *   `GET_BCC(data)`: 计算异或校验。
@@ -68,6 +71,8 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `-r, --reader`: 指定读卡器类型 (必须通过参数、环境变量或 `.env` 配置)。
 *   `--trace-driver`: 开启 DRIVER 层追踪。
 *   `--trace-protocol`: 开启 PROTOCOL 层追踪。
+*   `--trace-parse`: 解析级别 (0=关闭, 1=简单, 2=树状)。
+*   `--trace-card-type`: 卡片类型标识，注入到协议解析器。
 *   `--trace-level`: 设置日志级别 (默认: INFO)。
 
 环境变量优先级: CLI 参数 > 内层 `.env` > 外层 `.env` > 系统环境变量 > 硬编码默认值。
@@ -81,6 +86,34 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 | `NFC_TRACE_LEVEL` | 日志级别 | `INFO` |
 | `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
 | `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
+| `NFC_TRACE_PARSE` | 解析级别 | `1` |
+| `NFC_TRACE_CARD_TYPE` | 卡片类型标识 | - |
+| `NFC_TRACE_WIDTH` | 输出宽度 | - |
+
+### `nfc_cli.py`: 交互式卡片 CLI
+卡片交互式命令行工具，支持 `@cli_collect` 装饰器标记 list 参数。
+
+```python
+from nfc.nfc_cli import cli_collect
+
+@cli_collect(key=6, uid=4)    # key 固定 6 字节，uid 固定 4 字节
+def mf_auth(self, block, key_type, key, uid): ...
+
+@cli_collect(data=None)        # data 不定长，收集剩余参数
+def write(self, data): ...
+```
+
+*   固定长度：`@cli_collect(key=6)` — 精确收集 6 个值
+*   不定长：`@cli_collect(data=None)` — 收集所有剩余值
+*   无装饰器：回退到最后一个参数自动收集多余值
+
+CLI 调用示例：
+```
+> mf_auth 4 0 01 02 03 04 05 06 07 08 09 0A
+# → block=4, key_type=0, key=[1..6], uid=[7..10]
+> write 01 02 03 04
+# → data=[1,2,3,4]
+```
 
 ## 4. 依赖关系
 

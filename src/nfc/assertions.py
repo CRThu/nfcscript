@@ -19,6 +19,17 @@ def _get_stack_trace() -> str:
     return "\n".join(chain)
 
 def ASSERT_LEN(data: Any, expected_len: int, msg: str | None = None) -> None:
+    """
+    断言数据长度等于期望值。
+
+    Args:
+        data: 待检查的数据。
+        expected_len: 期望的长度。
+        msg: 失败时的自定义错误消息。
+
+    Raises:
+        AssertionError: 长度不匹配时抛出。
+    """
     actual_len = len(data)
     if actual_len != expected_len:
         error_msg = (
@@ -33,6 +44,17 @@ def ASSERT_LEN(data: Any, expected_len: int, msg: str | None = None) -> None:
         raise AssertionError(error_msg)
 
 def ASSERT_EQUAL(expected: Any, actual: Any, msg: str | None = None) -> None:
+    """
+    断言两个值相等。
+
+    Args:
+        expected: 期望值。
+        actual: 实际值。
+        msg: 失败时的自定义错误消息。
+
+    Raises:
+        AssertionError: 值不相等时抛出。
+    """
     if actual != expected:
         error_msg = (
             f"\nAssertion Failed: {msg}\n" if msg else ""
@@ -45,6 +67,16 @@ def ASSERT_EQUAL(expected: Any, actual: Any, msg: str | None = None) -> None:
         raise AssertionError(error_msg)
 
 def ASSERT_IS_NONE(value: Any, msg: str | None = None) -> None:
+    """
+    断言值为 None。
+
+    Args:
+        value: 待检查的值。
+        msg: 失败时的自定义错误消息。
+
+    Raises:
+        AssertionError: 值不为 None 时抛出。
+    """
     if value is not None:
         error_msg = (
             f"\nAssertion Failed: {msg}\n" if msg else ""
@@ -56,6 +88,19 @@ def ASSERT_IS_NONE(value: Any, msg: str | None = None) -> None:
         raise AssertionError(error_msg)
 
 def ASSERT_IS_NOT_NONE(value: T | None, msg: str | None = None) -> TypeGuard[T]:
+    """
+    断言值不为 None。
+
+    Args:
+        value: 待检查的值。
+        msg: 失败时的自定义错误消息。
+
+    Returns:
+        TypeGuard[T]: 值不为 None 时返回 True。
+
+    Raises:
+        AssertionError: 值为 None 时抛出。
+    """
     if value is None:
         error_msg = (
             f"\nAssertion Failed: {msg}\n" if msg else ""

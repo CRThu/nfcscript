@@ -1,6 +1,6 @@
 import os
 from contextlib import contextmanager
-from nfctester.drivers.card_reader import CardInfo, TransceiveResult
+from nfctester.drivers.card_reader import CardInfo, TransceiveBits
 from nfctester.registry import CardReaderRegistry
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
 from .checksum import GET_BCC
@@ -76,28 +76,27 @@ def get_reader():
     return _state.reader
 
 
-def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -> CardInfo | None:
+def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -> CardInfo | None:
     """
     寻卡操作，检测并激活目标卡片。
 
     Args:
-        ll: 如果为 True，则执行底层抗冲突流程以兼容非标卡；
-            如果为 False，则使用读卡器原生 active()。
+        low_layer: 如果为 True，由 nfcscript 执行底层抗冲突流程以兼容非标卡；
+            如果为 False，则使用读卡器驱动层原生 active()。
         ignore_error: 如果为 True，当 BCC 或 SAK 校验失败时，记录警告而不停止执行。
-        reqa_cmd: 底层寻卡时使用的 REQA 命令字节，默认 0x26。
-                  仅在 ll=True 时生效。
+        reqa_cmd: 底层寻卡时使用的 REQA 命令字节，默认 0x26。仅 low_layer=True 时生效。
 
     Returns:
         CardInfo: 包含卡片信息的数据类，失败时返回 None。
               属性说明:
-              - 'uid' (bytes): 卡片的 UID。
-              - 'atq' (bytes): 卡片的 ATQ (Answer To Request)。
+              - 'uid' (list[int]): 卡片的 UID。
+              - 'atq' (list[int]): 卡片的 ATQ (Answer To Request)。
               - 'sak' (int):   卡片的 SAK (Select Acknowledge)。
     """
     _state.ensure_connected()
     reader = _state.reader
 
-    if not ll:
+    if not low_layer:
         return reader.active()
 
     # 手动底层寻卡流程
@@ -129,7 +128,7 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
 
         print(f"cl{cl}.uid: {FORMAT_HEX(data)}")
         has_next = (data[0] == 0x88)
-        uid_to_select = list(data[0:5])
+        uid_to_select = data[0:5]
         sak_res = select(cl_level=cl, uid=uid_to_select)
 
         # SAK 校验
@@ -147,7 +146,7 @@ def active(ll: bool = False, ignore_error: bool = False, reqa_cmd: int = 0x26) -
             sak = sak_res[0] if sak_res else 0
             break
 
-    return CardInfo(uid=bytes(full_uid), atq=bytes(atq), sak=sak)
+    return CardInfo(uid=full_uid, atq=atq, sak=sak)
 
 
 def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> list[int]:
@@ -156,95 +155,137 @@ def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> lis
 
     Args:
         data: 要发送的字节列表。
-        tx_crc: 发送时是否自动添加 CRC。
-        rx_crc: 接收时是否自动校验 CRC。
+        tx_crc: 发送时是否自动添加 CRC。False 则原样发送。
+        rx_crc: 接收时是否自动校验 CRC。False 则原样接收不校验。
 
     Returns:
         list[int]: 接收到的数据字节列表。
     """
     _state.ensure_connected()
     reader = _state.reader
-    res = reader.transceive(bytes(data), tx_crc=tx_crc, rx_crc=rx_crc)
-    return list(res.data) if res and res.data else []
+    res = reader.transceive(data, tx_crc=tx_crc, rx_crc=rx_crc)
+    return res.data if res and res.data else []
 
 
-def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> TransceiveResult | None:
+def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> TransceiveBits | None:
     """
     使用底层帧交互方式发送数据，并支持对最后一个字节进行位控制。
 
     Args:
         data: 要发送的字节列表。
-        last_tx_bits: 最后一个字节实际发送的有效位数 (1-7)，
-                      0 表示发送完整字节。
-        tx_crc: 发送时是否自动添加 CRC。
-        rx_crc: 接收时是否自动校验 CRC。
+        last_tx_bits: 最后一个字节实际发送的有效位数 (1-7)，0 表示发送完整字节。
+        tx_crc: 发送时是否自动添加 CRC。False 则原样发送。
+        rx_crc: 接收时是否自动校验 CRC。False 则原样接收不校验。
 
     Returns:
-        TransceiveResult | None: 包含 data 和 rx_bits 属性，失败返回 None。
+        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
     """
     _state.ensure_connected()
     reader = _state.reader
-    return reader.transceive_bits(bytes(data), last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc)
+    return reader.transceive(data, last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc)
 
 
-def reqa(cmd: int = 0x26) -> TransceiveResult | None:
-    """ISO14443-A REQA (7 bits)"""
-    # REQA: 0x26，短帧，仅发送 7 bits，响应无 CRC
+def reqa(cmd: int = 0x26) -> TransceiveBits | None:
+    """
+    ISO14443-A REQA (7 bits)。
+
+    Args:
+        cmd: REQA 命令字节，默认 0x26。
+
+    Returns:
+        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
+    """
     return transceive_bits([cmd], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
 
-def wupa() -> TransceiveResult | None:
-    """ISO14443-A WUPA (7 bits)"""
-    # WUPA: 0x52，短帧，仅发送 7 bits，响应无 CRC
+def wupa() -> TransceiveBits | None:
+    """
+    ISO14443-A WUPA (7 bits)。
+
+    Returns:
+        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
+    """
     return transceive_bits([0x52], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
 
 def halt() -> list[int] | None:
-    """ISO14443-A HALT (Standard Frame)"""
-    # HALT: 0x50 0x00 + CRC
+    """
+    ISO14443-A HALT (Standard Frame)。
+
+    Returns:
+        list[int] | None: 返回响应数据，失败返回 None。
+    """
     return transceive([0x50, 0x00], tx_crc=True, rx_crc=True)
 
 
 def _get_sel_cmd(cl_level: int) -> int:
-    """根据 CL 级别获取 ISO14443-A SEL 命令字节"""
+    """
+    根据 CL 级别获取 ISO14443-A SEL 命令字节。
+
+    Args:
+        cl_level: CL 级别，1/2/3。
+
+    Returns:
+        int: 对应的 SEL 命令字节 (0x93/0x95/0x97)。
+
+    Raises:
+        ValueError: CL 级别不在 1/2/3 范围内。
+    """
     sel_map = {1: 0x93, 2: 0x95, 3: 0x97}
     if cl_level not in sel_map:
         raise ValueError(f"Invalid CL level: {cl_level}, must be 1, 2, or 3")
     return sel_map[cl_level]
 
 
-def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> TransceiveResult | None:
+def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> TransceiveBits | None:
     """
-    ISO14443-A ANTICOLL (Anti-collision)
-    :param cl_level: 1 (0x93), 2 (0x95), or 3 (0x97)
-    :param nvb: Number of Valid Bits，定义了包含 SEL 和 NVB 在内的有效位数
-    :param uid_prefix: 已知的部分 UID (0-4 字节)
-    :return: TransceiveResult 包含 data 和 rx_bits 属性
+    ISO14443-A ANTICOLL (Anti-collision)。
+
+    Args:
+        cl_level: CL 级别，1 (0x93), 2 (0x95), 或 3 (0x97)。
+        nvb: Number of Valid Bits，定义了包含 SEL 和 NVB 在内的有效位数。
+        uid_prefix: 已知的部分 UID (0-4 字节)。
+
+    Returns:
+        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
     """
     cmd = [_get_sel_cmd(cl_level), nvb] + uid_prefix
-    # 抗冲突响应无 CRC
     return transceive_bits(cmd, last_tx_bits=0, tx_crc=False, rx_crc=False)
 
 
 def select(cl_level: int, uid: list[int]) -> list[int] | None:
     """
-    ISO14443-A SELECT (Standard Frame)
-    :param cl_level: 1 (0x93), 2 (0x95), or 3 (0x97)
-    :param uid: 完整 5 字节 UID (包含 BCC)
+    ISO14443-A SELECT (Standard Frame)。
+
+    Args:
+        cl_level: CL 级别，1 (0x93), 2 (0x95), 或 3 (0x97)。
+        uid: 完整 5 字节 UID (包含 BCC)。
+
+    Returns:
+        list[int] | None: 返回响应数据，失败返回 None。
     """
     cmd = [_get_sel_cmd(cl_level), 0x70] + uid
-    # 选择帧需带 CRC
     return transceive(cmd, tx_crc=True, rx_crc=True)
 
 
 def field_on():
-    """开启 PN532 的 RF 场。"""
+    """
+    开启 PN532 的 RF 场。
+
+    Raises:
+        AssertionError: 未连接读卡器时抛出。
+    """
     _state.ensure_connected()
     _state.reader.rf_field = True
 
 
 def field_off():
-    """关闭 PN532 的 RF 场。"""
+    """
+    关闭 PN532 的 RF 场。
+
+    Raises:
+        AssertionError: 未连接读卡器时抛出。
+    """
     _state.ensure_connected()
     _state.reader.rf_field = False
 

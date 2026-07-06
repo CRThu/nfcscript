@@ -5,25 +5,43 @@ BIT_PATTERN = re.compile(r"(\d+)\s*\'h\s*([0-9a-fA-F]+)")
 
 def PARSE_HEX(text: str) -> tuple[str, int]:
     """
-    解析文本 -> (纯十六进制字符串, 最后字节有效位数)
-    支持: "AA BB 7'h03" -> ("AABB03", 7)
+    解析带位标记的 hex 字符串。
+
+    Args:
+        text: 十六进制文本。
+
+    Returns:
+        tuple[str, int]: (纯十六进制字符串, 最后字节有效位数)。
+
+    Raises:
+        ValueError: 不合法的十六进制数据时抛出。
+
+    Examples:
+        >>> PARSE_HEX("AA BB 7'h03")
+        ('AABB03', 7)
+        >>> PARSE_HEX("FF 4'h0C")
+        ('FF0C', 4)
+        >>> PARSE_HEX("AABBCC")
+        ('AABBCC', 0)
     """
     last_bits = 0
     cleaned = text.strip()
 
-    # 查找所有位标记
+    # 查找所有位标记，从右往左替换避免偏移
     matches = list(BIT_PATTERN.finditer(cleaned))
     if matches:
         last_match = matches[-1]
         last_bits = int(last_match.group(1))
-        hex_val = last_match.group(2)
-        
-        # 替换位标记为纯 hex
-        cleaned = cleaned[:last_match.start()] + hex_val + cleaned[last_match.end():]
+
+        for m in reversed(matches):
+            hex_val = m.group(2)
+            if len(hex_val) % 2 != 0:
+                hex_val = "0" + hex_val
+            cleaned = cleaned[:m.start()] + hex_val + cleaned[m.end():]
 
     # 去空格得到纯 hex
     clean_hex = cleaned.replace(" ", "")
-    
+
     # 简单的合法性检查
     if clean_hex:
         try:
@@ -35,17 +53,31 @@ def PARSE_HEX(text: str) -> tuple[str, int]:
 
 def FORMAT_HEX(data: int | bytes | list[int] | str, last_bits: int = 0) -> str:
     """
-    格式化数据为带位标记的可视化格式
-    支持输入类型: int, bytes, list[int], str (纯 hex)
-    示例:
-        FORMAT_HEX(0xAABB03, 7)        -> "AA BB 7'h03"
-        FORMAT_HEX("AABB03", 7)        -> "AA BB 7'h03"
-        FORMAT_HEX(b'\xaa\xbb\x03', 7) -> "AA BB 7'h03"
-        FORMAT_HEX([0xAA, 0xBB, 0x03], 7) -> "AA BB 7'h03"
+    格式化数据为带位标记的可视化格式。
+
+    支持输入类型: int, bytes, list[int], str (纯 hex)。
+
+    Args:
+        data: 待格式化的数据。
+        last_bits: 最后一个字节的有效位数 (1-7)，0 表示整字节。
+
+    Returns:
+        str: 格式化后的字符串。
+
+    Raises:
+        TypeError: 不支持的输入类型时抛出。
+
+    Examples:
+        >>> FORMAT_HEX(0xAABB03, 7)
+        "AA BB 7'h03"
+        >>> FORMAT_HEX([0xAA, 0xBB, 0x03])
+        'AA BB 03'
+        >>> FORMAT_HEX("AABB", 4)
+        "AA 4'hBB"
     """
     # 1. 统一转换为纯十六进制字符串
     if isinstance(data, int):
-        hex_str = hex(data)[2:].upper()
+        hex_str = data.to_bytes(max(1, (data.bit_length() + 7) // 8)).hex().upper()
     elif isinstance(data, bytes):
         hex_str = data.hex().upper()
     elif isinstance(data, list):

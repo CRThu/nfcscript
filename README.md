@@ -157,7 +157,7 @@ with session() as reader:
 |------|------|
 | `connect(port, reader_type)` | 连接读卡器 |
 | `get_reader()` | 获取当前读卡器实例 |
-| `active(ll, ignore_error)` | 寻卡，返回 uid/atq/sak |
+| `active(low_layer, ignore_error, reqa_cmd)` | 寻卡，返回 uid/atq/sak |
 | `transceive(data, tx_crc, rx_crc)` | 底层帧交互 |
 | `transceive_bits(data, last_tx_bits, tx_crc, rx_crc)` | 位控制帧交互 |
 | `reqa()` | ISO14443-A REQA |
@@ -181,7 +181,7 @@ with session() as reader:
 
 | 函数 | 说明 |
 |------|------|
-| `ASSERT_EQUAL(actual, expected, msg)` | 相等断言 |
+| `ASSERT_EQUAL(expected, actual, msg)` | 相等断言 |
 | `ASSERT_LEN(data, expected_len, msg)` | 长度断言 |
 | `ASSERT_IS_NOT_NONE(value, msg)` | 非空断言 |
 | `ASSERT_IS_NONE(value, msg)` | 空值断言 |

@@ -8,6 +8,25 @@ from nfc import *
 from nfctester.registry import CardRegistry
 
 
+def cli_collect(**lengths):
+    """
+    标记方法参数为 list 收集模式。
+
+    用法:
+        @cli_collect(key=6, uid=4)  # key 固定 6，uid 固定 4，剩余自动收集
+        @cli_collect(data=6)       # data 固定 6
+        @cli_collect()             # 回退到最后一个参数收集剩余
+
+    CLI 调用示例:
+        mf_auth 4 0 01 02 03 04 05 06 07 08 09 10
+        # → block=4, key_type=0, key=[1..6], uid=[7..10]
+    """
+    def decorator(func):
+        func._cli_collect = lengths
+        return func
+    return decorator
+
+
 def _load_external_cards(paths):
     """加载外部卡片模块，触发 @CardRegistry.register() 注册"""
     for path in paths:
@@ -82,36 +101,43 @@ def _call_method(method, args_str):
     params = list(sig.parameters.keys())
 
     if not args_str:
-        # 无参数调用
         return method()
 
-    # 解析参数
-    raw_args = args_str.split()
-    parsed = []
-    for i, raw in enumerate(raw_args):
-        parsed.append(_parse_value(raw))
+    parsed = [_parse_value(raw) for raw in args_str.split()]
 
     # 跳过 self
     if params and params[0] == "self":
         params = params[1:]
 
-    # 处理 bytes 参数：将多个连续值合并为 bytes
-    final_args = []
-    i = 0
-    while i < len(parsed):
-        if i < len(params):
-            param = sig.parameters[params[i] if params[0] != "self" else params[i]]
-            annotation = param.annotation
-            if annotation is bytes or (isinstance(annotation, type) and issubclass(annotation, bytes)):
-                # 收集剩余参数作为 bytes
-                remaining = [x for x in parsed[i:] if isinstance(x, (int, bytes))]
-                if remaining and all(isinstance(x, int) for x in remaining):
-                    final_args.append(bytes(remaining))
-                elif remaining:
-                    final_args.append(b"".join(x if isinstance(x, bytes) else bytes([x]) for x in remaining))
-                break
-        final_args.append(parsed[i])
-        i += 1
+    cli_collect_meta = getattr(method, '_cli_collect', None)
+
+    if cli_collect_meta:
+        # 装饰器模式：标记的按长度取，未标记的取单个值
+        # 无长度标记 (None) 的 list 参数收集剩余
+        final_args = []
+        i = 0
+        for param_name in params:
+            if param_name in cli_collect_meta:
+                length = cli_collect_meta[param_name]
+                if length is not None:
+                    final_args.append(parsed[i:i + length])
+                    i += length
+                else:
+                    # 不定长，收集剩余
+                    final_args.append(parsed[i:])
+                    break
+            else:
+                final_args.append(parsed[i])
+                i += 1
+    else:
+        # 回退模式：最后一个参数收集多余值为 list
+        if len(parsed) <= len(params):
+            # 参数刚好或不够，直接传
+            final_args = parsed
+        else:
+            # 有剩余，最后一个参数收集多余值
+            final_args = parsed[:len(params) - 1]
+            final_args.append(parsed[len(params) - 1:])
 
     return method(*final_args)
 
@@ -179,7 +205,7 @@ def main():
 
                 result = _call_method(methods[cmd_name], args_str)
                 if result is not None:
-                    if isinstance(result, bytes):
+                    if isinstance(result, list):
                         print(f"→ {FORMAT_HEX(result)}")
                     elif isinstance(result, bool):
                         print(f"→ {'OK' if result else 'FAIL'}")
