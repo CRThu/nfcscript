@@ -4,7 +4,8 @@ NFC Script Trace 模块
 提供日志追踪控制，包装 nfctester.trace 的功能。
 """
 
-from nfctester.trace import trace as _trace
+from typing import Callable
+from nfctester.trace import TraceEvent, trace as _trace
 
 
 def set_layer(layer: str, enable: bool = True):
@@ -33,7 +34,7 @@ def set_parse(level: int = 1):
     设置解析级别。
 
     Args:
-        level: 0=关闭, 1=简单(一行摘要), 2=复杂(树状结构)
+        level: 0=关闭(hex), 1=简单(hex + 摘要标签)
     """
     _trace.set_parse(level)
 
@@ -71,3 +72,23 @@ def success(msg: str):
 def debug(msg: str):
     """输出 DEBUG 级别日志"""
     _trace.debug(msg)
+
+
+def add_sink(fn: Callable[[TraceEvent], None]):
+    """
+    注册结构化 trace 事件回调。
+
+    Args:
+        fn: 回调函数，接收 TraceEvent 对象
+    """
+    _trace.add_sink(fn)
+
+
+def remove_sink(fn: Callable[[TraceEvent], None]):
+    """
+    移除结构化 trace 事件回调。
+
+    Args:
+        fn: 之前注册的回调函数
+    """
+    _trace.remove_sink(fn)
