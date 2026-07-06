@@ -1,6 +1,6 @@
 [project]
 name = "nfcscript"
-version = "0.0.9"
+version = "0.0.10"
 description = "A plugin-based core engine for DSL-style NFC testing automation."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.bumpversion]
-current_version = "0.0.9"
+current_version = "0.0.10"
 commit = true
 tag = true
 allow_dirty = true
