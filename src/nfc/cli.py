@@ -59,8 +59,6 @@ def main():
     parser.add_argument("--trace-protocol", action="store_true", help="开启 PROTOCOL 层追踪")
     parser.add_argument("--trace-parse", type=int, default=None, choices=[0, 1, 2],
                         help="解析级别: 0=关闭 1=简单 2=复杂 (默认: NFC_TRACE_PARSE 或 1)")
-    parser.add_argument("--trace-card-type", default=None,
-                        help="卡片类型标识 (默认: NFC_TRACE_CARD_TYPE)")
     parser.add_argument("--trace-level", default="INFO", help="日志级别 (默认: INFO)")
 
     args, extra = parser.parse_known_args()
@@ -87,7 +85,6 @@ def main():
     trace_driver = os.environ.get("NFC_TRACE_DRIVER", "").lower() in ("1", "true", "yes")
     trace_protocol = os.environ.get("NFC_TRACE_PROTOCOL", "").lower() in ("1", "true", "yes")
     trace_parse = os.environ.get("NFC_TRACE_PARSE", "1")
-    trace_card_type = os.environ.get("NFC_TRACE_CARD_TYPE")
     trace_width = os.environ.get("NFC_TRACE_WIDTH")
 
     if args.trace_level != "INFO":
@@ -98,15 +95,11 @@ def main():
         trace_protocol = True
     if args.trace_parse is not None:
         trace_parse = str(args.trace_parse)
-    if args.trace_card_type is not None:
-        trace_card_type = args.trace_card_type
 
     trace.set_level(trace_level)
     trace.set_layer("DRIVER", trace_driver)
     trace.set_layer("PROTOCOL", trace_protocol)
     trace.set_parse(_parse_level(trace_parse))
-    if trace_card_type is not None:
-        trace.set_card_type(trace_card_type)
     if trace_width is not None:
         os.environ["CRFT_TRACE_WIDTH"] = trace_width
 

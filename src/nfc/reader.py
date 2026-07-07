@@ -2,6 +2,7 @@ import os
 from contextlib import contextmanager
 from nfctester.drivers.card_reader import CardInfo, TransceiveBits
 from nfctester.registry import CardReaderRegistry
+from nfctester.trace import trace as _trace
 from .assertions import ASSERT_EQUAL, ASSERT_IS_NOT_NONE, ASSERT_LEN
 from .checksum import GET_BCC
 from .hex_util import FORMAT_HEX
@@ -146,7 +147,10 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
             sak = sak_res[0] if sak_res else 0
             break
 
-    return CardInfo(uid=full_uid, atq=atq, sak=sak)
+    info = CardInfo(uid=full_uid, atq=atq, sak=sak)
+    atqa = int.from_bytes(atq, "little")
+    _trace.set_parser(atqa, sak)
+    return info
 
 
 def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> list[int]:

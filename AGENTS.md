@@ -19,7 +19,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 
 *   `connect(port=None, reader_type=None)`: 通过 `CardReaderRegistry.create()` 创建并连接读卡器。默认从环境变量 `NFC_PORT` / `NFC_READER` 读取。
 *   `get_reader()`: 获取当前连接的读卡器实例，供 Card 类使用。
-*   `active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`low_layer=True` 由 nfcscript 执行底层抗冲突流程，`reqa_cmd` 仅 `low_layer=True` 时生效。
+*   `active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`active()` 自动根据 ATQA/SAK 切换协议解析器（由基类 `CardReader.active()` 统一处理）。`low_layer=True` 由 nfcscript 执行底层抗冲突流程，`reqa_cmd` 仅 `low_layer=True` 时生效。
 *   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
 *   `transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)`: 支持位控制的帧交互，返回 `TransceiveBits | None` (含 `.data` 和 `.bits` 属性)。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
 *   `reqa(cmd=0x26)`: ISO14443-A REQA 短帧命令。
@@ -37,13 +37,21 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `trace.set_layer(layer, enable)`: 开启/关闭追踪层 ("DRIVER", "PROTOCOL")。
 *   `trace.set_level(level)`: 设置日志级别 ("INFO", "DEBUG", "ERROR")。
 *   `trace.set_parse(level=1)`: 设置解析级别 (0=关闭, 1=简单(hex+摘要标签))。
-*   `trace.set_card_type(card_type)`: 设置卡片类型标识，注入到协议解析器。
 *   `trace.add_sink(fn)`: 注册结构化 trace 事件回调，接收 `TraceEvent` 对象（含 layer, direction, raw, parsed, summary, formatted, timestamp）。
 *   `trace.remove_sink(fn)`: 移除已注册的回调。
 *   `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)`: 输出日志。
 
 ### `__init__.py`: 模块入口
 导入所有子模块，自动导出公共函数。通过 `from nfc import *` 可导入全部工具，包括 `trace` 模块。
+
+### 协议解析器 (`ParserRegistry`)
+通过 `nfctester.ParserRegistry` 提供 ATQA/SAK → 协议解析器映射和自动切换：
+
+*   `ParserRegistry.register(atqa, sak, name)`: 装饰器，注册自定义协议解析器。
+*   `ParserRegistry.get(atqa, sak)`: 根据 ATQA/SAK 返回匹配的解析器类。
+*   `ParserRegistry.get_name(atqa, sak)`: 根据 ATQA/SAK 返回卡片类型显示名称。
+*   外部解析器只需继承 `BaseParser` 并用 `@ParserRegistry.register()` 装饰，import 即注册。
+*   **自动切换**: `CardReader.active()` 寻卡后自动调用 `trace.set_parser(atqa, sak)`，从 `ParserRegistry` 查找并注入对应的协议解析器。
 
 ### `assertions.py`: 测试断言工具
 *   `ASSERT_EQUAL(expected, actual, msg=None)`: 相等断言。
@@ -74,7 +82,6 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `--trace-driver`: 开启 DRIVER 层追踪。
 *   `--trace-protocol`: 开启 PROTOCOL 层追踪。
 *   `--trace-parse`: 解析级别 (0=关闭, 1=简单(hex+摘要标签))。
-*   `--trace-card-type`: 卡片类型标识，注入到协议解析器。
 *   `--trace-level`: 设置日志级别 (默认: INFO)。
 
 环境变量优先级: CLI 参数 > 内层 `.env` > 外层 `.env` > 系统环境变量 > 硬编码默认值。
@@ -89,7 +96,6 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 | `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
 | `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
 | `NFC_TRACE_PARSE` | 解析级别 | `1` |
-| `NFC_TRACE_CARD_TYPE` | 卡片类型标识 | - |
 | `NFC_TRACE_WIDTH` | 输出宽度 | - |
 
 ### `nfc_cli.py`: 交互式卡片 CLI
@@ -122,7 +128,7 @@ CLI 调用示例：
 ```
 nfcscript
     └── nfctester (workspace 依赖)
-            ├── registry (TransportRegistry, CardReaderRegistry, CardRegistry)
+            ├── registry (TransportRegistry, CardReaderRegistry, CardRegistry, ParserRegistry)
             ├── hardware (SerialTransport)
             ├── drivers (PN532_HSU)
             ├── cards (NTAG21x, NTAG224, MifareClassicCard, Type2Tag)

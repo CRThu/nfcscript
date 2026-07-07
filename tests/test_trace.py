@@ -37,14 +37,6 @@ class TestSetParse:
         mock_trace.set_parse.assert_called_once_with(2)
 
 
-class TestSetCardType:
-
-    @patch("nfc.trace._trace")
-    def test_set_card_type(self, mock_trace):
-        trace.set_card_type("mifare_classic_1k")
-        mock_trace.set_card_type.assert_called_once_with("mifare_classic_1k")
-
-
 class TestLogFunctions:
 
     @patch("nfc.trace._trace")

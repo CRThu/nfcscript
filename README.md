@@ -113,14 +113,14 @@ connect()
 trace.set_layer("DRIVER", True)
 trace.set_layer("PROTOCOL", True)
 
-# 寻卡
+# 寻卡（自动切换协议解析器）
 card_info = active()
 ASSERT_IS_NOT_NONE(card_info, "未扫描到卡片")
-print(f"UID: {card_info['uid'].hex().upper()}")
+print(f"UID: {' '.join(f'{b:02X}' for b in card_info.uid)}")
 
 # 创建卡片实例
 from nfctester.registry import CardRegistry
-card = CardRegistry.create("mifare", reader=get_reader())
+card = CardRegistry.create("mifare_classic", reader=get_reader())
 
 # 关闭连接
 close()
@@ -132,8 +132,8 @@ close()
 from nfc import *
 
 with session() as reader:
-    card_info = reader.find()
-    print(card_info)
+    card_info = reader.active()
+    print(card_info.uid)
 # 自动断开连接
 ```
 
@@ -157,7 +157,7 @@ with session() as reader:
 |------|------|
 | `connect(port, reader_type)` | 连接读卡器 |
 | `get_reader()` | 获取当前读卡器实例 |
-| `active(low_layer, ignore_error, reqa_cmd)` | 寻卡，返回 uid/atq/sak |
+| `active(low_layer, ignore_error, reqa_cmd)` | 寻卡，返回 CardInfo (uid/atq/sak)，自动切换协议解析器 |
 | `transceive(data, tx_crc, rx_crc)` | 底层帧交互 |
 | `transceive_bits(data, last_tx_bits, tx_crc, rx_crc)` | 位控制帧交互 |
 | `reqa()` | ISO14443-A REQA |
@@ -175,6 +175,9 @@ with session() as reader:
 |------|------|
 | `trace.set_layer(layer, enable)` | 开启/关闭追踪层 |
 | `trace.set_level(level)` | 设置日志级别 |
+| `trace.set_parse(level)` | 设置解析级别 (0=关闭, 1=hex+摘要) |
+| `trace.add_sink(fn)` | 注册结构化 trace 事件回调 |
+| `trace.remove_sink(fn)` | 移除已注册的回调 |
 | `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)` | 输出日志 |
 
 ### assertions.py
