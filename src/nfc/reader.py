@@ -103,7 +103,7 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
     # 手动底层寻卡流程
     # 1. REQA
     res_reqa = reqa(cmd=reqa_cmd)
-    if not res_reqa:
+    if not res_reqa.data:
         return None
     atq = res_reqa.data
 
@@ -111,7 +111,7 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
     full_uid = []
     for cl in [1, 2, 3]:
         res = anticoll(cl_level=cl, nvb=0x20)
-        if not res or not res.data:
+        if not res.data:
             return None
 
         data = res.data
@@ -171,7 +171,7 @@ def transceive(data: list[int], tx_crc: bool = True, rx_crc: bool = True) -> lis
     return res.data if res and res.data else []
 
 
-def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> TransceiveBits | None:
+def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True, rx_crc: bool = True) -> TransceiveBits:
     """
     使用底层帧交互方式发送数据，并支持对最后一个字节进行位控制。
 
@@ -182,14 +182,15 @@ def transceive_bits(data: list[int], last_tx_bits: int = 0, tx_crc: bool = True,
         rx_crc: 接收时是否自动校验 CRC。False 则原样接收不校验。
 
     Returns:
-        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
+        TransceiveBits: 包含 data 和 bits 属性，失败返回空的 TransceiveBits(data=[], bits=0)。
     """
     _state.ensure_connected()
     reader = _state.reader
-    return reader.transceive(data, last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc)
+    res = reader.transceive(data, last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc)
+    return res if res else TransceiveBits(data=[], bits=0)
 
 
-def reqa(cmd: int = 0x26) -> TransceiveBits | None:
+def reqa(cmd: int = 0x26) -> TransceiveBits:
     """
     ISO14443-A REQA (7 bits)。
 
@@ -197,27 +198,27 @@ def reqa(cmd: int = 0x26) -> TransceiveBits | None:
         cmd: REQA 命令字节，默认 0x26。
 
     Returns:
-        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
+        TransceiveBits: 包含 data 和 bits 属性，失败返回空的 TransceiveBits(data=[], bits=0)。
     """
     return transceive_bits([cmd], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
 
-def wupa() -> TransceiveBits | None:
+def wupa() -> TransceiveBits:
     """
     ISO14443-A WUPA (7 bits)。
 
     Returns:
-        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
+        TransceiveBits: 包含 data 和 bits 属性，失败返回空的 TransceiveBits(data=[], bits=0)。
     """
     return transceive_bits([0x52], last_tx_bits=7, tx_crc=False, rx_crc=False)
 
 
-def halt() -> list[int] | None:
+def halt() -> list[int]:
     """
     ISO14443-A HALT (Standard Frame)。
 
     Returns:
-        list[int] | None: 返回响应数据，失败返回 None。
+        list[int]: 返回响应数据。
     """
     return transceive([0x50, 0x00], tx_crc=True, rx_crc=True)
 
@@ -241,7 +242,7 @@ def _get_sel_cmd(cl_level: int) -> int:
     return sel_map[cl_level]
 
 
-def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> TransceiveBits | None:
+def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> TransceiveBits:
     """
     ISO14443-A ANTICOLL (Anti-collision)。
 
@@ -251,13 +252,13 @@ def anticoll(cl_level: int, nvb: int = 0x20, uid_prefix: list[int] = []) -> Tran
         uid_prefix: 已知的部分 UID (0-4 字节)。
 
     Returns:
-        TransceiveBits | None: 包含 data 和 bits 属性，失败返回 None。
+        TransceiveBits: 包含 data 和 bits 属性，失败返回空的 TransceiveBits(data=[], bits=0)。
     """
     cmd = [_get_sel_cmd(cl_level), nvb] + uid_prefix
     return transceive_bits(cmd, last_tx_bits=0, tx_crc=False, rx_crc=False)
 
 
-def select(cl_level: int, uid: list[int]) -> list[int] | None:
+def select(cl_level: int, uid: list[int]) -> list[int]:
     """
     ISO14443-A SELECT (Standard Frame)。
 
@@ -266,7 +267,7 @@ def select(cl_level: int, uid: list[int]) -> list[int] | None:
         uid: 完整 5 字节 UID (包含 BCC)。
 
     Returns:
-        list[int] | None: 返回响应数据，失败返回 None。
+        list[int]: 返回响应数据。
     """
     cmd = [_get_sel_cmd(cl_level), 0x70] + uid
     return transceive(cmd, tx_crc=True, rx_crc=True)

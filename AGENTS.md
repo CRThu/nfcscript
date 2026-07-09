@@ -21,7 +21,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `get_reader()`: 获取当前连接的读卡器实例，供 Card 类使用。
 *   `active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`active()` 自动根据 ATQA/SAK 切换协议解析器（由基类 `CardReader.active()` 统一处理）。`low_layer=True` 由 nfcscript 执行底层抗冲突流程，`reqa_cmd` 仅 `low_layer=True` 时生效。
 *   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
-*   `transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)`: 支持位控制的帧交互，返回 `TransceiveBits | None` (含 `.data` 和 `.bits` 属性)。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
+*   `transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)`: 支持位控制的帧交互，返回 `TransceiveBits` (含 `.data` 和 `.bits` 属性)。失败时返回空列表 `data=[]`。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
 *   `reqa(cmd=0x26)`: ISO14443-A REQA 短帧命令。
 *   `wupa()`: ISO14443-A WUPA 短帧命令。
 *   `halt()`: ISO14443-A HALT 命令。

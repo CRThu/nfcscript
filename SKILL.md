@@ -28,11 +28,11 @@ active(low_layer=False, ignore_error=False, reqa_cmd=0x26)
 # 返回 CardInfo(uid: list[int], atq: list[int], sak: int) 或 None
 # low_layer=True: nfcscript 手动底层寻卡流程（兼容非标卡）；reqa_cmd 仅 low_layer=True 时生效
 
-reqa(cmd=0x26)   # REQA（7-bit 短帧），返回 TransceiveBits | None
-wupa()           # WUPA，返回 TransceiveBits | None
+reqa(cmd=0x26)   # REQA（7-bit 短帧），返回 TransceiveBits
+wupa()           # WUPA，返回 TransceiveBits
 halt()
 select(cl_level, uid)                # uid: 5-byte list（含 BCC）
-anticoll(cl_level, nvb=0x20, uid_prefix=[])  # 返回 TransceiveBits | None
+anticoll(cl_level, nvb=0x20, uid_prefix=[])  # 返回 TransceiveBits
 ```
 
 ### 数据收发
@@ -43,7 +43,7 @@ transceive(data, tx_crc=True, rx_crc=True)
 # tx_crc/rx_crc=False 时原样收发，不加/不校验 CRC
 
 transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)
-# 返回 TransceiveBits | None
+# 返回 TransceiveBits (失败时 data=[])
 # TransceiveBits: .data: list[int], .bits: int
 # tx_crc/rx_crc=False 时原样收发，不加/不校验 CRC
 ```
