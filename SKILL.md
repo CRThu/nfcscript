@@ -61,7 +61,8 @@ ASSERT_IS_NONE(value, msg=None)
 
 ```python
 FORMAT_HEX(data, last_bits=0)   # "AA BB 7'h03"
-PARSE_HEX(text)                  # ("AABB03", 7)
+PARSE_HEX(text)                  # [0xAA, 0xBB, 0xCC]
+PARSE_HEX_BITS(text, last_bits=None)  # ([0xAA, 0x0B], 4)
 BITS_UPDATE(val, mask, data)     # 读-改-写
 BITS_SET(val, mask)
 BITS_RESET(val, mask)
@@ -189,3 +190,4 @@ data = card.read_block(8)
 - 脚本固定结构：`connect()` → `field_on()` → ... → `field_off()` → `close()`
 - `BaseTag` 从 `nfctester.cards` 导入；`BaseCard` 同理
 - 注册卡片：`@CardRegistry.register("name")` 装饰器，`from nfctester.registry import CardRegistry`
+- **禁止删除现有注释**：脚本可能存在被注释的情况，除非明确确认无用，否则不得删除

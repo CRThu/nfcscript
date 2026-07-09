@@ -3,53 +3,107 @@ import re
 # 位标记正则：匹配 N'hXX 格式 (如 7'h26, 4'hC)
 BIT_PATTERN = re.compile(r"(\d+)\s*\'h\s*([0-9a-fA-F]+)")
 
-def PARSE_HEX(text: str) -> tuple[str, int]:
+
+def PARSE_HEX(text: str) -> list[int]:
     """
-    解析带位标记的 hex 字符串。
+    解析纯 hex 字符串为 list[int]。
 
     Args:
-        text: 十六进制文本。
+        text: 十六进制文本，支持空格分隔 (如 "AA BB CC" 或 "AABBCC")。
 
     Returns:
-        tuple[str, int]: (纯十六进制字符串, 最后字节有效位数)。
+        list[int]: 解析后的字节列表。
 
     Raises:
         ValueError: 不合法的十六进制数据时抛出。
 
     Examples:
-        >>> PARSE_HEX("AA BB 7'h03")
-        ('AABB03', 7)
-        >>> PARSE_HEX("FF 4'h0C")
-        ('FF0C', 4)
-        >>> PARSE_HEX("AABBCC")
-        ('AABBCC', 0)
+        >>> PARSE_HEX("AA BB CC")
+        [0xAA, 0xBB, 0xCC]
+        >>> PARSE_HEX("0011")
+        [0x00, 0x11]
     """
-    last_bits = 0
-    cleaned = text.strip()
-
-    # 查找所有位标记，从右往左替换避免偏移
-    matches = list(BIT_PATTERN.finditer(cleaned))
-    if matches:
-        last_match = matches[-1]
-        last_bits = int(last_match.group(1))
-
-        for m in reversed(matches):
-            hex_val = m.group(2)
-            if len(hex_val) % 2 != 0:
-                hex_val = "0" + hex_val
-            cleaned = cleaned[:m.start()] + hex_val + cleaned[m.end():]
-
     # 去空格得到纯 hex
-    clean_hex = cleaned.replace(" ", "")
+    clean_hex = text.replace(" ", "").upper()
 
     # 简单的合法性检查
     if clean_hex:
         try:
-            bytes.fromhex(clean_hex)
+            return list(bytes.fromhex(clean_hex))
         except ValueError:
             raise ValueError(f"不合法的十六进制数据: {clean_hex}")
+    return []
 
-    return clean_hex, last_bits
+
+def PARSE_HEX_BITS(text: str, last_bits: int | None = None) -> tuple[list[int], int]:
+    """
+    解析 hex 字符串为 tuple[list[int], int]，支持 Verilog 位标记。
+
+    支持格式:
+    - 纯 hex: "AA BB CC" → ([0xAA, 0xBB, 0xCC], 0)
+    - Verilog 标记: "AA 4'hBB" → ([0xAA, 0x0B], 4)
+    - 混合: "AA BB 7'h03" → ([0xAA, 0xBB, 0x03], 7)
+    - 手动指定: "AA BB", last_bits=4 → ([0xAA, 0xBB], 4)
+
+    Args:
+        text: 十六进制文本，支持空格分隔和 N'hXX 位标记。
+        last_bits: 可选的最后字节有效位数，与 Verilog 标记冲突时报错。
+
+    Returns:
+        tuple[list[int], int]: (字节列表, 最后字节有效位数)。
+
+    Raises:
+        ValueError: 不合法的十六进制数据、位标记冲突或多标记时报错。
+
+    Examples:
+        >>> PARSE_HEX_BITS("AA BB CC")
+        ([0xAA, 0xBB, 0xCC], 0)
+        >>> PARSE_HEX_BITS("AA 4'hBB")
+        ([0xAA, 0x0B], 4)
+        >>> PARSE_HEX_BITS("0011", last_bits=4)
+        ([0x00, 0x01], 4)
+        >>> PARSE_HEX_BITS("AA 4'hBB", last_bits=4)
+        ValueError: 冲突
+    """
+    # 冲突检测：只允许一个 Verilog 标记
+    matches = list(BIT_PATTERN.finditer(text))
+    if len(matches) > 1:
+        raise ValueError("只允许一个 Verilog 位标记")
+    if matches and last_bits is not None:
+        raise ValueError("last_bits 参数与 Verilog 位标记冲突")
+
+    bits = last_bits if last_bits is not None else 0
+
+    # 处理 Verilog 位标记
+    if matches:
+        m = matches[0]
+        n_bits = int(m.group(1))
+        bits = n_bits
+        # 按 bits 截断: 4'hCA → 0x0A
+        val = int(m.group(2), 16) & ((1 << n_bits) - 1)
+        hex_val = format(val, 'X')
+        if len(hex_val) % 2 != 0:
+            hex_val = '0' + hex_val
+        text = text[:m.start()] + hex_val + text[m.end():]
+
+    # 去空格得到纯 hex
+    clean_hex = text.replace(" ", "").upper()
+
+    # 解析 hex 数据
+    if clean_hex:
+        try:
+            data = list(bytes.fromhex(clean_hex))
+        except ValueError:
+            raise ValueError(f"不合法的十六进制数据: {clean_hex}")
+    else:
+        data = []
+
+    # last_bits 截断最后一个字节
+    if bits and data:
+        data[-1] = data[-1] & ((1 << bits) - 1)
+
+    return data, bits
+
 
 def FORMAT_HEX(data: int | bytes | list[int] | str, last_bits: int = 0) -> str:
     """
@@ -97,17 +151,17 @@ def FORMAT_HEX(data: int | bytes | list[int] | str, last_bits: int = 0) -> str:
     # 3. 有 last_bits，处理最后一个字节
     if len(hex_str) <= 2:
         return f"{last_bits}'h{hex_str}"
-    
+
     prefix = hex_str[:-2]
     last_byte = hex_str[-2:]
-    
     formatted_prefix = ' '.join(prefix[i:i+2] for i in range(0, len(prefix), 2))
     return f"{formatted_prefix} {last_bits}'h{last_byte}"
+
 
 if __name__ == "__main__":
     # --- 测试例程 ---
     print("=== Hex 工具测试 ===")
-    
+
     # 测试用例: (data, last_bits, 类型名)
     test_cases = [
         ("AABB03", 7, "str"),
@@ -120,12 +174,16 @@ if __name__ == "__main__":
         (0xAABBCC, 0, "int"),
         (b'\xAA\xBB\xCC', 0, "bytes"),
     ]
-    
+
     for data, b, typename in test_cases:
         formatted = FORMAT_HEX(data, b)
         print(f"输入: ({data}, {b}, {typename}) -> 格式化: {formatted}")
-        
+
         # 反向解析验证
-        parsed_h, parsed_b = PARSE_HEX(formatted)
-        print(f"解析: {formatted} -> Hex: {parsed_h}, Bits: {parsed_b}")
+        if b:
+            parsed, bits = PARSE_HEX_BITS(formatted)
+            print(f"解析: {formatted} -> Hex: {parsed}, Bits: {bits}")
+        else:
+            parsed = PARSE_HEX(formatted)
+            print(f"解析: {formatted} -> Hex: {parsed}")
         print("-" * 20)

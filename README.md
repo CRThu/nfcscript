@@ -201,7 +201,8 @@ with session() as reader:
 
 | 函数 | 说明 |
 |------|------|
-| `PARSE_HEX(text)` | 解析 hex 字符串 |
+| `PARSE_HEX(text)` | 解析纯 hex，返回 `list[int]` |
+| `PARSE_HEX_BITS(text, last_bits=None)` | 解析 hex + Verilog 位标记，返回 `tuple[list[int], int]` |
 | `FORMAT_HEX(data, last_bits)` | 格式化为可视化 hex |
 
 ### checksum.py

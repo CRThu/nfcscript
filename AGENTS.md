@@ -65,7 +65,8 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `BITS_RESET(val, mask)`: 清位。
 
 ### `hex_util.py`: 十六进制工具
-*   `PARSE_HEX(text)`: 解析带位标记的 hex 字符串。
+*   `PARSE_HEX(text)`: 解析纯 hex 字符串，返回 `list[int]`。
+*   `PARSE_HEX_BITS(text, last_bits=None)`: 解析 hex 字符串，支持 Verilog 位标记，返回 `tuple[list[int], int]`。`last_bits` 与 Verilog 标记冲突时报错。
 *   `FORMAT_HEX(data, last_bits=0)`: 格式化为可视化 hex。
 
 ### `checksum.py`: 校验工具
