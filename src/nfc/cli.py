@@ -41,8 +41,8 @@ def main():
     parser.add_argument("script", help="脚本文件路径")
     parser.add_argument("-p", "--port", default=None, help="串口号 (默认: NFC_PORT 环境变量或 COM20)")
     parser.add_argument("-r", "--reader", default=None, help="读卡器类型 (默认: NFC_READER 环境变量或 pn532)")
-    parser.add_argument("--trace", default=None, help="启用的层 (逗号分隔: driver,debug,protocol,warning,error,app,all)")
-    parser.add_argument("--level", default=None, help="最低日志级别 (trace/debug/warning/error/app, 默认: warning)")
+    parser.add_argument("--trace-layer", default=None, help="启用的层 (逗号分隔: driver,debug,protocol,warning,error,app,all)")
+    parser.add_argument("--trace-level", default=None, help="最低日志级别 (driver/debug/protocol/warning/error/app, 默认: warning)")
 
     args, extra = parser.parse_known_args()
 
@@ -64,23 +64,23 @@ def main():
 
     from nfc import trace
 
-    # 解析 --trace: 启用指定层
-    trace_env = os.environ.get("NFC_TRACE", "")
-    trace_arg = args.trace or trace_env
+    # 解析 --trace-layer: 启用指定层 (调试用，默认已开启 protocol/warning/error/app)
+    trace_env = os.environ.get("NFC_TRACE_LAYER", "")
+    trace_arg = args.trace_layer or trace_env
     if trace_arg:
-        trace.set_level("trace")  # 允许所有层可见
+        trace.filter.level = "driver"  # 允许所有层可见
         for name in trace_arg.split(","):
             name = name.strip().lower()
             if name == "all":
                 for layer in ["driver", "debug", "protocol", "warning", "error", "app"]:
-                    trace.set_layer(layer, True)
+                    setattr(trace.filter, layer, True)
             elif name:
-                trace.set_layer(name, True)
+                setattr(trace.filter, name, True)
 
-    # 解析 --level: 最低级别过滤
+    # 解析 --trace-level: 最低级别过滤
     level_env = os.environ.get("NFC_TRACE_LEVEL", "warning")
-    level_arg = args.level or level_env
-    trace.set_level(level_arg)
+    level_arg = args.trace_level or level_env
+    trace.filter.level = level_arg
 
     run_script(args.script)
 

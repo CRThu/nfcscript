@@ -3,32 +3,6 @@ from unittest.mock import patch, MagicMock
 from nfc import trace
 
 
-class TestSetLayer:
-
-    @patch("nfc.trace._trace")
-    def test_set_layer_enable(self, mock_trace):
-        trace.set_layer("DRIVER", True)
-        mock_trace.set_layer.assert_called_once_with("DRIVER", True)
-
-    @patch("nfc.trace._trace")
-    def test_set_layer_disable(self, mock_trace):
-        trace.set_layer("PROTOCOL", False)
-        mock_trace.set_layer.assert_called_once_with("PROTOCOL", False)
-
-    @patch("nfc.trace._trace")
-    def test_set_layer_default_enable(self, mock_trace):
-        trace.set_layer("DRIVER")
-        mock_trace.set_layer.assert_called_once_with("DRIVER", True)
-
-
-class TestSetLevel:
-
-    @patch("nfc.trace._trace")
-    def test_set_level(self, mock_trace):
-        trace.set_level("DEBUG")
-        mock_trace.set_level.assert_called_once_with("DEBUG")
-
-
 class TestSetParse:
 
     @patch("nfc.trace._trace")
@@ -55,11 +29,16 @@ class TestLogFunctions:
         mock_trace.warning.assert_called_once_with("warn message")
 
     @patch("nfc.trace._trace")
-    def test_success(self, mock_trace):
-        trace.success("ok message")
-        mock_trace.success.assert_called_once_with("ok message")
-
-    @patch("nfc.trace._trace")
     def test_debug(self, mock_trace):
         trace.debug("debug message")
         mock_trace.debug.assert_called_once_with("debug message")
+
+    @patch("nfc.trace._trace")
+    def test_app(self, mock_trace):
+        trace.app("app message")
+        mock_trace.app.assert_called_once_with("app message")
+
+    @patch("nfc.trace._trace")
+    def test_log(self, mock_trace):
+        trace.log("log message", layer="debug")
+        mock_trace.log.assert_called_once_with("log message", "debug")

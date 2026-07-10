@@ -26,13 +26,13 @@ nfcscript test_card.py -p COM21
 nfcscript test_card.py -r acr122u
 
 # 开启追踪层
-nfcscript test_card.py --trace=protocol,debug
+nfcscript test_card.py --trace-layer=protocol,debug
 
 # 设置日志级别
-nfcscript test_card.py --level=trace
+nfcscript test_card.py --trace-level=driver
 
 # 组合使用
-nfcscript test_card.py -p COM21 -r pn532 --trace=protocol,debug --level=trace
+nfcscript test_card.py -p COM21 -r pn532 --trace-layer=protocol,debug --trace-level=driver
 ```
 
 ### nfc-cli - 交互式命令行
@@ -110,8 +110,8 @@ from nfc import *
 connect()
 
 # 开启追踪
-trace.driver = True
-trace.protocol = True
+trace.filter.driver = True
+trace.filter.protocol = True
 
 # 寻卡（自动切换协议解析器）
 card_info = active()
@@ -185,11 +185,11 @@ with session() as reader:
 
 | 属性 | 说明 |
 |------|------|
-| `trace.driver = True` | 启用 driver 层 |
-| `trace.protocol = True` | 启用 protocol 层 |
-| `trace.debug = False` | 禁用 debug 层 |
-| `trace.level = "warning"` | 设置最低日志级别 |
-| `trace.level = 30` | 或用数字 |
+| `trace.filter.driver = True` | 启用 driver 层 |
+| `trace.filter.protocol = True` | 启用 protocol 层 |
+| `trace.filter.debug = False` | 禁用 debug 层 |
+| `trace.filter.level = "warning"` | 设置最低日志级别 |
+| `trace.filter.level = 30` | 或用数字 |
 
 ```python
 # 简洁写法
@@ -197,9 +197,9 @@ trace.app("UID: AA BB CC DD")
 trace.debug("[auth] Rt: 80 81")
 
 # 属性控制
-trace.driver = True
-trace.protocol = True
-trace.level = "debug"
+trace.filter.driver = True
+trace.filter.protocol = True
+trace.filter.level = "debug"
 ```
 
 ### assertions.py
@@ -247,7 +247,7 @@ trace.level = "debug"
 |------|------|--------|
 | `NFC_PORT` | 串口号 | - |
 | `NFC_READER` | 读卡器类型 | - |
-| `NFC_TRACE` | 启用的层 (逗号分隔) | - |
+| `NFC_TRACE_LAYER` | 启用的层 (逗号分隔) | - |
 | `NFC_TRACE_LEVEL` | 最低日志级别 | `warning` |
 | `NFC_CARD_PATH` | 外部卡片模块搜索路径 (分号分隔) | - |
 
@@ -263,8 +263,8 @@ trace.level = "debug"
 ```
 NFC_PORT=COM20
 NFC_READER=pn532
-NFC_TRACE_LEVEL=warning
-NFC_TRACE=protocol,debug
+NFC_TRACE_LAYER=protocol,warning,error,app
+NFC_TRACE_LEVEL=protocol
 ```
 
 ## AI 编写脚本

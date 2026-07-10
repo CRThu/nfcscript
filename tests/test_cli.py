@@ -1,8 +1,8 @@
-"""cli 模块测试 (_find_dotenv_all / _parse_level / run_script)"""
+"""cli 模块测试 (_find_dotenv_all / run_script)"""
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from nfc.cli import _find_dotenv_all, _parse_level
+from nfc.cli import _find_dotenv_all
 
 
 class TestFindDotenvAll:
@@ -32,46 +32,6 @@ class TestFindDotenvAll:
         assert result[0].endswith(".env")
         assert result[1].endswith(".env")
         assert result[0] != result[1]
-
-
-class TestParseLevel:
-
-    def test_zero(self):
-        assert _parse_level("0") == 0
-
-    def test_false(self):
-        assert _parse_level("false") == 0
-
-    def test_off(self):
-        assert _parse_level("off") == 0
-
-    def test_one(self):
-        assert _parse_level("1") == 1
-
-    def test_simple(self):
-        assert _parse_level("simple") == 1
-
-    def test_summary(self):
-        assert _parse_level("summary") == 1
-
-    def test_two(self):
-        assert _parse_level("2") == 2
-
-    def test_full(self):
-        assert _parse_level("full") == 2
-
-    def test_tree(self):
-        assert _parse_level("tree") == 2
-
-    def test_case_insensitive(self):
-        assert _parse_level("FULL") == 2
-        assert _parse_level("False") == 0
-
-    def test_unknown_falls_to_1(self):
-        assert _parse_level("unknown") == 1
-
-    def test_whitespace(self):
-        assert _parse_level("  2  ") == 2
 
 
 class TestRunScript:

@@ -39,12 +39,10 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `trace.log(msg, layer="app")`: 通用文本日志，指定层 (driver/debug/protocol/warning/error/app)。
 
 **属性控制（推荐）：**
-*   `trace.driver = True` / `trace.protocol = True` / `trace.debug = False`: 启用/禁用追踪层。
-*   `trace.level = "warning"` 或 `trace.level = 30`: 设置最低日志级别。
+*   `trace.filter.driver = True` / `trace.filter.protocol = True` / `trace.filter.debug = False`: 启用/禁用追踪层。
+*   `trace.filter.level = "warning"` 或 `trace.filter.level = 30`: 设置最低日志级别。
 
-**方法控制（向后兼容）：**
-*   `trace.set_layer(layer, enable)`: 开启/关闭追踪层。
-*   `trace.set_level(level)`: 设置最低日志级别。
+**方法：**
 *   `trace.set_parse(level=1)`: 设置解析级别 (0=关闭, 1=简单(hex+摘要标签))。
 
 **结构化回调：**
@@ -89,8 +87,8 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `nfcscript <script_path>`: 运行脚本。
 *   `-p, --port`: 指定串口号 (必须通过参数、环境变量或 `.env` 配置)。
 *   `-r, --reader`: 指定读卡器类型 (必须通过参数、环境变量或 `.env` 配置)。
-*   `--trace=layer,layer`: 启用指定层 (逗号分隔: driver,debug,protocol,warning,error,app,all)。
-*   `--level=level`: 最低日志级别 (trace/debug/warning/error/app, 默认: warning)。
+*   `--trace-layer=layer,layer`: 启用指定层 (逗号分隔: driver,debug,protocol,warning,error,app,all)。
+*   `--trace-level=level`: 最低日志级别 (driver/debug/protocol/warning/error/app, 默认: warning)。
 
 环境变量优先级: CLI 参数 > 内层 `.env` > 外层 `.env` > 系统环境变量 > 硬编码默认值。
 
@@ -100,7 +98,7 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 |------|------|--------|
 | `NFC_PORT` | 串口号 | - |
 | `NFC_READER` | 读卡器类型 | - |
-| `NFC_TRACE` | 启用的层 (逗号分隔) | - |
+| `NFC_TRACE_LAYER` | 启用的层 (逗号分隔) | - |
 | `NFC_TRACE_LEVEL` | 最低日志级别 | `warning` |
 
 ### `nfc_cli.py`: 交互式卡片 CLI
@@ -160,7 +158,7 @@ nfcscript
 ## 7. 调试指南
 *   检查注册表: `from nfctester.registry import CardRegistry; print(CardRegistry.list())`
 *   检查连接: `connect()` 后检查 `_reader` 是否为 `None`。
-*   开启追踪: 使用 CLI 参数 `--trace=protocol,debug` 或在脚本中调用 `trace.set_layer()`。
+*   开启追踪: 使用 CLI 参数 `--trace-layer=protocol,debug` 或在脚本中设置 `trace.filter.protocol = True`。
 *   通信日志: 由底层 `nfctester.trace` 模块处理，支持 6 层 (driver/debug/protocol/warning/error/app)。
 
 ---

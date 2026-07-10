@@ -4,9 +4,7 @@ NFC Script Trace 模块
 统一日志 API，包装 nfctester.trace 的 6 层日志系统。
 层: driver, debug, protocol, warning, error, app
 
-支持两种控制方式：
-1. 属性控制: trace.driver = True, trace.level = "warning"
-2. 方法控制: trace.set_layer("driver", True), trace.set_level("warning")
+过滤器控制: trace.filter.driver = True, trace.filter.level = "warning"
 """
 
 from typing import Callable
@@ -53,27 +51,6 @@ def __setattr__(name, value):
 def __getattr__(name):
     """属性获取: trace.driver"""
     return getattr(_trace, name)
-
-
-def set_layer(layer: str, enable: bool = True):
-    """
-    开启或关闭追踪层。
-
-    Args:
-        layer: 层级名称 ("driver", "debug", "protocol", "warning", "error", "app")
-        enable: True 开启，False 关闭
-    """
-    _trace.set_layer(layer, enable)
-
-
-def set_level(level: str):
-    """
-    设置最低日志级别。
-
-    Args:
-        level: 级别名称 ("trace", "debug", "warning", "error", "app")
-    """
-    _trace.set_level(level)
 
 
 def set_parse(level: int = 1):
