@@ -28,14 +28,14 @@ class _NFCState:
         self._reader = CardReaderRegistry.create(reader_type, transport="serial", port=port)
         self._reader.open()
         self._connected = True
-        print(f"Connected to {reader_type.upper()} on port {port}")
+        _trace.log(f"Connected to {reader_type.upper()} on port {port}", layer="app")
 
     def disconnect(self):
         if self._connected and self._reader:
             self._reader.close()
             self._connected = False
             self._reader = None
-            print("Disconnected")
+            _trace.log("Disconnected", layer="app")
 
     def ensure_connected(self):
         ASSERT_IS_NOT_NONE(self._reader, msg="NFC driver not connected. Call connect() first.")
@@ -125,9 +125,9 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
             if not ignore_error:
                 ASSERT_EQUAL(expected_bcc, data[4], msg=f"CL{cl} BCC 校验失败: data={FORMAT_HEX(data)}")
             elif data[4] != expected_bcc:
-                print(f"Warning: CL{cl} BCC 校验失败")
+                _trace.log(f"Warning: CL{cl} BCC 校验失败", layer="warning")
 
-        print(f"cl{cl}.uid: {FORMAT_HEX(data)}")
+        _trace.log(f"cl{cl}.uid: {FORMAT_HEX(data)}", layer="app")
         has_next = (data[0] == 0x88)
         uid_to_select = data[0:5]
         sak_res = select(cl_level=cl, uid=uid_to_select)
@@ -137,7 +137,7 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
             if not ignore_error:
                 ASSERT_IS_NOT_NONE(sak_res, msg=f"CL{cl} SAK 选择失败")
             else:
-                print(f"Warning: CL{cl} SAK 选择失败")
+                _trace.log(f"Warning: CL{cl} SAK 选择失败", layer="warning")
 
         if has_next:
             full_uid.extend(data[1:4])

@@ -32,14 +32,23 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `close()`: 断开连接。
 
 ### `trace.py`: 日志追踪模块
-包装 `nfctester.trace`，提供日志控制和结构化事件回调功能：
+包装 `nfctester.trace`，提供 6 层日志系统：
 
-*   `trace.set_layer(layer, enable)`: 开启/关闭追踪层 ("DRIVER", "PROTOCOL")。
-*   `trace.set_level(level)`: 设置日志级别 ("INFO", "DEBUG", "ERROR")。
+**输出日志：**
+*   `trace.app(msg)` / `trace.debug(msg)` / `trace.warning(msg)` / `trace.error(msg)`: 简洁写法，直接输出到对应层。
+*   `trace.log(msg, layer="app")`: 通用文本日志，指定层 (driver/debug/protocol/warning/error/app)。
+
+**属性控制（推荐）：**
+*   `trace.driver = True` / `trace.protocol = True` / `trace.debug = False`: 启用/禁用追踪层。
+*   `trace.level = "warning"` 或 `trace.level = 30`: 设置最低日志级别。
+
+**方法控制（向后兼容）：**
+*   `trace.set_layer(layer, enable)`: 开启/关闭追踪层。
+*   `trace.set_level(level)`: 设置最低日志级别。
 *   `trace.set_parse(level=1)`: 设置解析级别 (0=关闭, 1=简单(hex+摘要标签))。
-*   `trace.add_sink(fn)`: 注册结构化 trace 事件回调，接收 `TraceEvent` 对象（含 layer, direction, raw, parsed, summary, formatted, timestamp）。
-*   `trace.remove_sink(fn)`: 移除已注册的回调。
-*   `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)`: 输出日志。
+
+**结构化回调：**
+*   `trace.add_sink(fn)` / `trace.remove_sink(fn)`: 结构化 trace 事件回调。
 
 ### `__init__.py`: 模块入口
 导入所有子模块，自动导出公共函数。通过 `from nfc import *` 可导入全部工具，包括 `trace` 模块。
@@ -80,10 +89,8 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 *   `nfcscript <script_path>`: 运行脚本。
 *   `-p, --port`: 指定串口号 (必须通过参数、环境变量或 `.env` 配置)。
 *   `-r, --reader`: 指定读卡器类型 (必须通过参数、环境变量或 `.env` 配置)。
-*   `--trace-driver`: 开启 DRIVER 层追踪。
-*   `--trace-protocol`: 开启 PROTOCOL 层追踪。
-*   `--trace-parse`: 解析级别 (0=关闭, 1=简单(hex+摘要标签))。
-*   `--trace-level`: 设置日志级别 (默认: INFO)。
+*   `--trace=layer,layer`: 启用指定层 (逗号分隔: driver,debug,protocol,warning,error,app,all)。
+*   `--level=level`: 最低日志级别 (trace/debug/warning/error/app, 默认: warning)。
 
 环境变量优先级: CLI 参数 > 内层 `.env` > 外层 `.env` > 系统环境变量 > 硬编码默认值。
 
@@ -93,11 +100,8 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 |------|------|--------|
 | `NFC_PORT` | 串口号 | - |
 | `NFC_READER` | 读卡器类型 | - |
-| `NFC_TRACE_LEVEL` | 日志级别 | `INFO` |
-| `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
-| `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
-| `NFC_TRACE_PARSE` | 解析级别 | `1` |
-| `NFC_TRACE_WIDTH` | 输出宽度 | - |
+| `NFC_TRACE` | 启用的层 (逗号分隔) | - |
+| `NFC_TRACE_LEVEL` | 最低日志级别 | `warning` |
 
 ### `nfc_cli.py`: 交互式卡片 CLI
 卡片交互式命令行工具，支持 `@cli_collect` 装饰器标记 list 参数。
@@ -156,8 +160,8 @@ nfcscript
 ## 7. 调试指南
 *   检查注册表: `from nfctester.registry import CardRegistry; print(CardRegistry.list())`
 *   检查连接: `connect()` 后检查 `_reader` 是否为 `None`。
-*   开启追踪: 使用 CLI 参数 `--trace-driver --trace-protocol` 或在脚本中调用 `trace.set_layer()`。
-*   通信日志: 由底层 `nfctester.trace` 模块处理，支持 DRIVER 和 PROTOCOL 两层。
+*   开启追踪: 使用 CLI 参数 `--trace=protocol,debug` 或在脚本中调用 `trace.set_layer()`。
+*   通信日志: 由底层 `nfctester.trace` 模块处理，支持 6 层 (driver/debug/protocol/warning/error/app)。
 
 ---
 *保持架构简单。nfcscript 是 nfctester 的 DSL 薄封装层，不是独立的插件系统。*

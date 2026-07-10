@@ -26,13 +26,13 @@ nfcscript test_card.py -p COM21
 nfcscript test_card.py -r acr122u
 
 # 开启追踪层
-nfcscript test_card.py --trace-driver --trace-protocol
+nfcscript test_card.py --trace=protocol,debug
 
 # 设置日志级别
-nfcscript test_card.py --trace-level DEBUG
+nfcscript test_card.py --level=trace
 
 # 组合使用
-nfcscript test_card.py -p COM21 -r pn532 --trace-driver --trace-protocol --trace-level DEBUG
+nfcscript test_card.py -p COM21 -r pn532 --trace=protocol,debug --level=trace
 ```
 
 ### nfc-cli - 交互式命令行
@@ -110,13 +110,13 @@ from nfc import *
 connect()
 
 # 开启追踪
-trace.set_layer("DRIVER", True)
-trace.set_layer("PROTOCOL", True)
+trace.driver = True
+trace.protocol = True
 
 # 寻卡（自动切换协议解析器）
 card_info = active()
 ASSERT_IS_NOT_NONE(card_info, "未扫描到卡片")
-print(f"UID: {' '.join(f'{b:02X}' for b in card_info.uid)}")
+trace.app(f"UID: {' '.join(f'{b:02X}' for b in card_info.uid)}")
 
 # 创建卡片实例
 from nfctester.registry import CardRegistry
@@ -133,7 +133,7 @@ from nfc import *
 
 with session() as reader:
     card_info = reader.active()
-    print(card_info.uid)
+    trace.app(f"UID: {card_info.uid}")
 # 自动断开连接
 ```
 
@@ -171,14 +171,36 @@ with session() as reader:
 
 ### trace.py
 
+**简洁写法（推荐）：**
+
 | 函数 | 说明 |
 |------|------|
-| `trace.set_layer(layer, enable)` | 开启/关闭追踪层 |
-| `trace.set_level(level)` | 设置日志级别 |
-| `trace.set_parse(level)` | 设置解析级别 (0=关闭, 1=hex+摘要) |
-| `trace.add_sink(fn)` | 注册结构化 trace 事件回调 |
-| `trace.remove_sink(fn)` | 移除已注册的回调 |
-| `trace.info(msg)` / `trace.error(msg)` / `trace.warning(msg)` / `trace.success(msg)` / `trace.debug(msg)` | 输出日志 |
+| `trace.app(msg)` | 输出到 app 层 (level=50) |
+| `trace.debug(msg)` | 输出到 debug 层 (level=10) |
+| `trace.warning(msg)` | 输出到 warning 层 (level=30) |
+| `trace.error(msg)` | 输出到 error 层 (level=40) |
+| `trace.log(msg, layer="app")` | 通用文本日志，指定层 |
+
+**属性控制（推荐）：**
+
+| 属性 | 说明 |
+|------|------|
+| `trace.driver = True` | 启用 driver 层 |
+| `trace.protocol = True` | 启用 protocol 层 |
+| `trace.debug = False` | 禁用 debug 层 |
+| `trace.level = "warning"` | 设置最低日志级别 |
+| `trace.level = 30` | 或用数字 |
+
+```python
+# 简洁写法
+trace.app("UID: AA BB CC DD")
+trace.debug("[auth] Rt: 80 81")
+
+# 属性控制
+trace.driver = True
+trace.protocol = True
+trace.level = "debug"
+```
 
 ### assertions.py
 
@@ -225,9 +247,8 @@ with session() as reader:
 |------|------|--------|
 | `NFC_PORT` | 串口号 | - |
 | `NFC_READER` | 读卡器类型 | - |
-| `NFC_TRACE_LEVEL` | 日志级别 | `INFO` |
-| `NFC_TRACE_DRIVER` | 开启 DRIVER 层追踪 | `false` |
-| `NFC_TRACE_PROTOCOL` | 开启 PROTOCOL 层追踪 | `false` |
+| `NFC_TRACE` | 启用的层 (逗号分隔) | - |
+| `NFC_TRACE_LEVEL` | 最低日志级别 | `warning` |
 | `NFC_CARD_PATH` | 外部卡片模块搜索路径 (分号分隔) | - |
 
 支持多层 `.env` 加载：从脚本目录向上搜索所有 `.env` 文件，按从外到内的顺序依次加载（内层覆盖外层同名变量）。
@@ -242,9 +263,8 @@ with session() as reader:
 ```
 NFC_PORT=COM20
 NFC_READER=pn532
-NFC_TRACE_LEVEL=DEBUG
-NFC_TRACE_DRIVER=true
-NFC_TRACE_PROTOCOL=true
+NFC_TRACE_LEVEL=warning
+NFC_TRACE=protocol,debug
 ```
 
 ## AI 编写脚本
