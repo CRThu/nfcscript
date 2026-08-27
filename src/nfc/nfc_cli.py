@@ -172,13 +172,13 @@ def main():
         parser.error("需要指定卡片类型 (-c/--card) 或使用 --list-cards 查看可用类型")
 
     try:
-        connect(port=args.port, reader_type=args.reader)
+        reader.connect(port=args.port, reader_type=args.reader)
     except Exception as e:
         print(f"连接读卡器失败: {e}")
         sys.exit(1)
 
     try:
-        card = CardRegistry.create(args.card, reader=get_reader())
+        card = CardRegistry.create(args.card, reader=reader.target)
         methods = _get_methods(card)
 
         print(f"已连接卡片: {args.card}")
@@ -220,7 +220,7 @@ def main():
                 print(f"错误: {e}")
 
     finally:
-        close()
+        reader.close()
         print("已断开连接")
 
 

@@ -14,22 +14,22 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 
 ## 3. 核心组件 (src/nfc/)
 
-### `reader.py`: 全局函数接口
-提供模块级函数，封装底层 nfctester 操作：
+### `reader.py`: 读卡器单例与生命周期管理 (`reader`)
+提供全能惰性单例代理 `reader`，封装底层 `nfctester` 操作与自动化安全生命周期：
 
-*   `connect(port=None, reader_type=None)`: 通过 `CardReaderRegistry.create()` 创建并连接读卡器。默认从环境变量 `NFC_PORT` / `NFC_READER` 读取。
-*   `get_reader()`: 获取当前连接的读卡器实例，供 Card 类使用。
-*   `active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`active()` 自动根据 ATQA/SAK 切换协议解析器（由基类 `CardReader.active()` 统一处理）。`low_layer=True` 由 nfcscript 执行底层抗冲突流程，`reqa_cmd` 仅 `low_layer=True` 时生效。
-*   `transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
-*   `transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)`: 支持位控制的帧交互，返回 `TransceiveBits` (含 `.data` 和 `.bits` 属性)。失败时返回空列表 `data=[]`。`tx_crc=False`/`rx_crc=False` 时原样收发不加/不校验 CRC。
-*   `reqa(cmd=0x26)`: ISO14443-A REQA 短帧命令。
-*   `wupa()`: ISO14443-A WUPA 短帧命令。
-*   `halt()`: ISO14443-A HALT 命令。
-*   `select(cl_level, uid)`: ISO14443-A SELECT。
-*   `anticoll(cl_level, nvb=0x20, uid_prefix=[])`: ISO14443-A ANTICOLL。
-*   `field_on()` / `field_off()`: RF 场控制。
-*   `session(port=None, reader_type=None)`: 上下文管理器，自动管理连接生命周期。
-*   `close()`: 断开连接。
+*   **惰性连接与环境注入**：自动向上搜索加载 `.env` 并读取 `NFC_PORT` / `NFC_READER`，首次调用时自动连接，脚本无需显式 `connect()`。
+*   **物理 RF 场控制**：`reader.rf = True` / `reader.rf = False`（或 `reader.rf_field`）直接控制物理天线。
+*   **进程退出安全清理 (Zero-Boilerplate Teardown)**：单例自动注册 `atexit` 钩子，无论是正常退出还是异常中断，均自动先关 RF 场再关物理串口，彻底杜绝串口死锁与占用。
+*   `reader.active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`active()` 自动根据 ATQA/SAK 切换协议解析器。`low_layer=True` 由 nfcscript 执行底层抗冲突流程。
+*   `reader.transceive(data, tx_crc=True, rx_crc=True)`: 底层帧交互，返回接收字节列表。
+*   `reader.transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)`: 支持位控制的帧交互，返回 `TransceiveBits`。
+*   `reader.reqa(cmd=0x26)`: ISO14443-A REQA 短帧命令。
+*   `reader.wupa()`: ISO14443-A WUPA 短帧命令。
+*   `reader.halt()`: ISO14443-A HALT 命令。
+*   `reader.select(cl_level, uid)`: ISO14443-A SELECT。
+*   `reader.anticoll(cl_level, nvb=0x20, uid_prefix=[])`: ISO14443-A ANTICOLL。
+*   `reader.session(port=None, reader_type=None)`: 局部会话管理器。
+*   `reader.connect(...)` / `reader.close()`: 手动显式连接与关闭。
 
 ### `trace.py`: 日志追踪模块
 包装 `nfctester.trace`，提供 6 层日志系统：

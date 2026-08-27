@@ -10,39 +10,43 @@ description: 使用 nfcscript DSL 生成 NFC 测试脚本和卡片驱动。当�
 
 ## API
 
-### 读卡器
+### 读卡器单例 (`reader`)
+
+支持从 `.env` 自动注入环境变量 `NFC_PORT` 与 `NFC_READER`，首次操作自动连接，退出自动关闭 RF 与串口：
 
 ```python
-connect(port=None, reader_type=None)  # 连接（参数可选，优先从环境变量读）
-get_reader()                          # 获取当前读卡器实例
-close()                               # 断开
-session(port=None, reader_type=None)  # 上下文管理器，yield reader，自动断开
-```
+from nfc import reader
 
-### RF 控制与寻卡
+# 1. 射频场控制
+reader.rf = True          # 开启 RF 场 (或 reader.field_on())
+reader.rf = False         # 关闭 RF 场 (或 reader.field_off())
 
-```python
-field_on()
-field_off()
-active(low_layer=False, ignore_error=False, reqa_cmd=0x26)
+# 2. 寻卡激活
+card = reader.active(low_layer=False, ignore_error=False, reqa_cmd=0x26)
 # 返回 CardInfo(uid: list[int], atq: list[int], sak: int) 或 None
-# low_layer=True: nfcscript 手动底层寻卡流程（兼容非标卡）；reqa_cmd 仅 low_layer=True 时生效
+# low_layer=True: 手动底层寻卡流程（兼容非标卡）；reqa_cmd 仅 low_layer=True 时生效
 
-reqa(cmd=0x26)   # REQA（7-bit 短帧），返回 TransceiveBits
-wupa()           # WUPA，返回 TransceiveBits
-halt()
-select(cl_level, uid)                # uid: 5-byte list（含 BCC）
-anticoll(cl_level, nvb=0x20, uid_prefix=[])  # 返回 TransceiveBits
+# 3. ISO14443-A 底层指令
+reader.reqa(cmd=0x26)     # REQA（7-bit 短帧），返回 TransceiveBits
+reader.wupa()             # WUPA，返回 TransceiveBits
+reader.halt()             # HALT
+reader.select(cl_level, uid)                # uid: 5-byte list（含 BCC）
+reader.anticoll(cl_level, nvb=0x20, uid_prefix=[])  # 返回 TransceiveBits
+
+# 4. 手动控制 (可选)
+reader.connect(port=None, reader_type=None)  # 显式连接（默认自动按需连接）
+reader.close()                               # 显式断开（退出时 atexit 自动清理）
+with reader.session(port="COM21", reader_type="pn532"): ... # 局部会话
 ```
 
 ### 数据收发
 
 ```python
-transceive(data, tx_crc=True, rx_crc=True)
-# data: list[int]，返回 list[int]（空列表表示失败）
+res = reader.transceive(data, tx_crc=True, rx_crc=True)
+# data: list[int] | bytes，返回 list[int]（空列表表示失败）
 # tx_crc/rx_crc=False 时原样收发，不加/不校验 CRC
 
-transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)
+res_bits = reader.transceive_bits(data, last_tx_bits=0, tx_crc=True, rx_crc=True)
 # 返回 TransceiveBits (失败时 data=[])
 # TransceiveBits: .data: list[int], .bits: int
 # tx_crc/rx_crc=False 时原样收发，不加/不校验 CRC
