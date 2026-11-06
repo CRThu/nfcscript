@@ -330,6 +330,37 @@ class TestGetSelCmd:
             _get_sel_cmd(4)
 
 
+class TestActive:
+
+    def test_active_pn532_routes_to_rdr_active_on_std_reqa(self):
+        mock = _mock_reader()
+        mock.name = "pn532"
+        reader._target = mock
+        reader._connected = True
+
+        res = nfc.active(low_layer=True)
+        assert res is not None
+        mock.active.assert_called_once()
+
+    @patch("nfc.reader.anticoll")
+    @patch("nfc.reader.select")
+    @patch("nfc.reader.reqa")
+    def test_active_clrc663_executes_low_layer(self, mock_reqa, mock_select, mock_anticoll):
+        mock = _mock_reader()
+        mock.name = "clrc663"
+        reader._target = mock
+        reader._connected = True
+
+        mock_reqa.return_value = TransceiveBits(data=[0x44, 0x00], bits=8)
+        mock_anticoll.return_value = TransceiveBits(data=[0x01, 0x02, 0x03, 0x04, 0x04], bits=40)
+        mock_select.return_value = [0x00]
+
+        res = nfc.active(low_layer=True)
+        assert res is not None
+        assert res.uid == [0x01, 0x02, 0x03, 0x04]
+        mock.active.assert_not_called()
+
+
 class TestReaderSingletonProxy:
 
     @patch.object(CardReaderRegistry, "create")

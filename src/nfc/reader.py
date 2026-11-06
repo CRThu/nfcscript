@@ -217,7 +217,9 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
     """
     rdr = get_reader()
 
-    if not low_layer:
+    # PN532 固件在未激活 Target 前无法通过 InCommunicateThru (0x42) 发送裸位 REQA；
+    # 当使用标准 REQA (0x26) 时，自动路由至 PN532 原生 InListPassiveTarget 硬件寻卡
+    if not low_layer or (getattr(rdr, "name", "") == "pn532" and reqa_cmd == 0x26):
         return rdr.active()
 
     # 手动底层寻卡流程
