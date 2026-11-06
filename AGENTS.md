@@ -18,6 +18,10 @@ nfcscript **不实现**自己的 Registry，而是直接使用 `nfctester.regist
 提供全能惰性单例代理 `reader`，封装底层 `nfctester` 操作与自动化安全生命周期：
 
 *   **惰性连接与环境注入**：自动向上搜索加载 `.env` 并读取 `NFC_PORT` / `NFC_READER`，首次调用时自动连接，脚本无需显式 `connect()`。
+*   **物理属性与能力契约**：
+    *   `reader.name`: 驱动名称（如 `"pn532"`, `"clrc663"`）。
+    *   `reader.fifo_size`: 读卡器物理 FIFO 深度常量（PN532 为 64 字节，CLRC663 为 512 字节），用于流式测试动态计算最大包长。
+    *   `reader.lazy_crc`: 读写属性（默认 `True`），原生惰性 CRC 状态缓存，消除冗余 UART 寄存器读写开销。
 *   **物理 RF 场控制**：`reader.rf = True` / `reader.rf = False`（或 `reader.rf_field`）直接控制物理天线。
 *   **进程退出安全清理 (Zero-Boilerplate Teardown)**：单例自动注册 `atexit` 钩子，无论是正常退出还是异常中断，均自动先关 RF 场再关物理串口，彻底杜绝串口死锁与占用。
 *   `reader.active(low_layer=False, ignore_error=False, reqa_cmd=0x26)`: 寻卡，返回 `CardInfo | None`（含 `uid`, `atq`, `sak`）。`active()` 自动根据 ATQA/SAK 切换协议解析器。`low_layer=True` 由 nfcscript 执行底层抗冲突流程。

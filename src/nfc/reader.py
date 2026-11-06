@@ -84,6 +84,26 @@ class _ReaderFacade:
         return getattr(get_reader(), "mf_crypto", False)
 
     @property
+    def name(self) -> str:
+        """读卡器驱动名称 (如 'pn532', 'clrc663')。"""
+        return getattr(get_reader(), "name", "")
+
+    @property
+    def fifo_size(self) -> int:
+        """读卡器内部物理硬件 FIFO 深度 (字节)。"""
+        return getattr(get_reader(), "fifo_size", 64)
+
+    @property
+    def lazy_crc(self) -> bool:
+        """是否启用惰性 CRC 状态缓存。"""
+        return getattr(get_reader(), "lazy_crc", True)
+
+    @lazy_crc.setter
+    def lazy_crc(self, value: bool) -> None:
+        """设置是否启用惰性 CRC 状态缓存。"""
+        get_reader().lazy_crc = value
+
+    @property
     def target(self) -> Any:
         """获取当前连接的底层 CardReader 实例。"""
         return get_reader()

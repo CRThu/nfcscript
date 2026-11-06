@@ -25,6 +25,9 @@ def _mock_reader():
     mock.active.return_value = CardInfo(uid=[0x01, 0x02, 0x03, 0x04], atq=[0x44, 0x00], sak=0x00)
     mock.rf_field = False
     mock.mf_crypto = False
+    mock.name = "pn532"
+    mock.fifo_size = 64
+    mock.lazy_crc = True
     return mock
 
 
@@ -82,6 +85,28 @@ class TestGetReader:
         monkeypatch.delenv("NFC_READER", raising=False)
         with pytest.raises(AssertionError):
             nfc.get_reader()
+
+
+class TestReaderFacadeCapabilities:
+    def test_reader_properties(self):
+        mock = _mock_reader()
+        mock.name = "clrc663"
+        mock.fifo_size = 512
+        mock.lazy_crc = True
+        reader._target = mock
+        reader._connected = True
+
+        assert reader.name == "clrc663"
+        assert reader.fifo_size == 512
+        assert reader.lazy_crc is True
+
+    def test_reader_lazy_crc_setter(self):
+        mock = _mock_reader()
+        reader._target = mock
+        reader._connected = True
+
+        reader.lazy_crc = False
+        assert mock.lazy_crc is False
 
 
 class TestTransceive:

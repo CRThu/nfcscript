@@ -17,9 +17,12 @@ description: 使用 nfcscript DSL 生成 NFC 测试脚本和卡片驱动。当�
 ```python
 from nfc import reader
 
-# 1. 射频场控制
+# 1. 射频场控制与硬件属性
 reader.rf = True          # 开启 RF 场 (或 reader.field_on())
 reader.rf = False         # 关闭 RF 场 (或 reader.field_off())
+reader.name               # 读卡器芯片驱动名称 ("pn532" / "clrc663")
+reader.fifo_size          # 读卡器硬件 FIFO 深度 (PN532: 64, CLRC663: 512)
+reader.lazy_crc           # 惰性 CRC 缓存开关 (默认 True)
 
 # 2. 寻卡激活
 card = reader.active(low_layer=False, ignore_error=False, reqa_cmd=0x26)
