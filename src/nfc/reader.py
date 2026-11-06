@@ -254,7 +254,12 @@ def active(low_layer: bool = False, ignore_error: bool = False, reqa_cmd: int = 
     return info
 
 
-def transceive(data: list[int] | bytes, tx_crc: bool = True, rx_crc: bool = True) -> list[int]:
+def transceive(
+    data: list[int] | bytes,
+    tx_crc: bool = True,
+    rx_crc: bool = True,
+    timeout: float = 0.5,
+) -> list[int]:
     """
     使用底层帧交互方式发送数据。
 
@@ -262,13 +267,14 @@ def transceive(data: list[int] | bytes, tx_crc: bool = True, rx_crc: bool = True
         data: 要发送的字节列表或 bytes。
         tx_crc: 发送时是否自动添加 CRC。False 则原样发送。
         rx_crc: 接收时是否自动校验 CRC。False 则原样接收不校验。
+        timeout: 接收超时时间 (秒)，默认 0.5s。
 
     Returns:
         list[int]: 接收到的数据字节列表。
     """
     rdr = get_reader()
     raw_list = list(data) if isinstance(data, (bytes, bytearray)) else data
-    res = rdr.transceive(raw_list, tx_crc=tx_crc, rx_crc=rx_crc)
+    res = rdr.transceive(raw_list, tx_crc=tx_crc, rx_crc=rx_crc, timeout=timeout)
     return res.data if res and res.data else []
 
 
@@ -277,6 +283,7 @@ def transceive_bits(
     last_tx_bits: int = 0,
     tx_crc: bool = True,
     rx_crc: bool = True,
+    timeout: float = 0.5,
 ) -> TransceiveBits:
     """
     使用底层帧交互方式发送数据，并支持对最后一个字节进行位控制。
@@ -286,13 +293,14 @@ def transceive_bits(
         last_tx_bits: 最后一个字节实际发送的有效位数 (1-7)，0 表示发送完整字节。
         tx_crc: 发送时是否自动添加 CRC。False 则原样发送。
         rx_crc: 接收时是否自动校验 CRC。False 则原样接收不校验。
+        timeout: 接收超时时间 (秒)，默认 0.5s。
 
     Returns:
         TransceiveBits: 包含 data 和 bits 属性，失败返回空的 TransceiveBits(data=[], bits=0)。
     """
     rdr = get_reader()
     raw_list = list(data) if isinstance(data, (bytes, bytearray)) else data
-    res = rdr.transceive(raw_list, last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc)
+    res = rdr.transceive(raw_list, last_tx_bits=last_tx_bits, tx_crc=tx_crc, rx_crc=rx_crc, timeout=timeout)
     return res if res else TransceiveBits(data=[], bits=0)
 
 

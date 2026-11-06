@@ -35,7 +35,7 @@ wheels = [
 
 [[package]]
 name = "nfcscript"
-version = "0.0.16"
+version = "0.0.17"
 source = { editable = "." }
 dependencies = [
     { name = "nfctester" },
@@ -62,16 +62,16 @@ dev = [
 
 [[package]]
 name = "nfctester"
-version = "0.0.49"
+version = "0.0.50"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "loguru" },
     { name = "pycryptodome" },
     { name = "pyserial" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/87/77/76e97595cc4c56f55a3b16d968282aaeab8f9d207aac729e4e7d96216d97/nfctester-0.0.49.tar.gz", hash = "sha256:d42faed25fac6e90c4b93f2d2e3c4c42571b05906523c16a39f0d9130972e32d", size = 46119, upload-time = "2026-08-27T08:37:22.85Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/1d/f07c88ea0760282d98272747186c605dce945845b49470ba68a8e6c47ce0/nfctester-0.0.50.tar.gz", hash = "sha256:da131de47fd722046fd4575dba9d97037b96311c80f0b94d26204430cbb1910f", size = 46088, upload-time = "2026-10-30T11:19:21.541Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/88/51aacf4660ed6b3cfc5f3ce1d6fbd60039d8f9b2816a5bbc7413316fe130/nfctester-0.0.49-py3-none-any.whl", hash = "sha256:42ff0772997aa10730eb4222190fafc43189dccf762a1a82c98ee051a4750e3c", size = 57178, upload-time = "2026-08-27T08:37:21.73Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/72/f66042cc59395e5b82e5183b469a4a0e090c6887e0c771f62c0e311cf2fd/nfctester-0.0.50-py3-none-any.whl", hash = "sha256:204bb817fb8d826dcee4d779306d35ae56bb848d192a4163a7d33952e2774423", size = 57193, upload-time = "2026-10-30T11:19:20.117Z" },
 ]
 
 [[package]]

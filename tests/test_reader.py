@@ -92,14 +92,21 @@ class TestTransceive:
         reader._connected = True
         result = nfc.transceive([0x30, 0x00])
         assert result == [0xAA, 0xBB]
-        mock.transceive.assert_called_once_with([0x30, 0x00], tx_crc=True, rx_crc=True)
+        mock.transceive.assert_called_once_with([0x30, 0x00], tx_crc=True, rx_crc=True, timeout=0.5)
 
     def test_transceive_no_crc(self):
         mock = _mock_reader()
         reader._target = mock
         reader._connected = True
         nfc.transceive([0x30], tx_crc=False, rx_crc=False)
-        mock.transceive.assert_called_once_with([0x30], tx_crc=False, rx_crc=False)
+        mock.transceive.assert_called_once_with([0x30], tx_crc=False, rx_crc=False, timeout=0.5)
+
+    def test_transceive_with_timeout(self):
+        mock = _mock_reader()
+        reader._target = mock
+        reader._connected = True
+        nfc.transceive([0x30], timeout=1.2)
+        mock.transceive.assert_called_once_with([0x30], tx_crc=True, rx_crc=True, timeout=1.2)
 
     def test_transceive_empty_result(self):
         mock = _mock_reader()
@@ -131,7 +138,7 @@ class TestTransceiveBits:
         reader._target = mock
         reader._connected = True
         nfc.transceive_bits([0x26], last_tx_bits=7, tx_crc=False, rx_crc=False)
-        mock.transceive.assert_called_once_with([0x26], last_tx_bits=7, tx_crc=False, rx_crc=False)
+        mock.transceive.assert_called_once_with([0x26], last_tx_bits=7, tx_crc=False, rx_crc=False, timeout=0.5)
 
 
 class TestReqa:
